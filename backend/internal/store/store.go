@@ -2,20 +2,21 @@ package store
 
 import (
 	"database/sql"
-	_ "embed"
+	"embed"
 	"fmt"
 
+	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 )
 
-//go:embed schema.sql
-var schema string
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 type Store struct {
 	db *sql.DB
 }
 
-// Open abre (ou cria) o banco em path e aplica o schema.
+// Open abre (ou cria) o banco em path e aplica as migrações pendentes.
 func Open(path string) (*Store, error) {
 	dsn := fmt.Sprintf(
 		"file:%s?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)",
@@ -33,8 +34,8 @@ func Open(path string) (*Store, error) {
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("conectando ao banco: %w", err)
 	}
-	if _, err := db.Exec(schema); err != nil {
-		return nil, fmt.Errorf("aplicando schema: %w", err)
+	if err := migrate(db); err != nil {
+		return nil, err
 	}
 
 	s := &Store{db: db}
@@ -44,6 +45,24 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
+// migrate aplica as migrações de internal/store/migrations que ainda não
+// rodaram neste banco, em ordem de versão. O goose registra cada uma na
+// tabela goose_db_version, então um banco existente recebe só o que falta —
+// é isso que faz uma coluna nova chegar à produção, e não apenas aos bancos
+// criados do zero em desenvolvimento.
+//
+// Nunca edite uma migração já aplicada: ela não roda de novo, e a alteração
+// passaria a existir só em bancos novos. Para mudar algo, crie a próxima.
+func migrate(db *sql.DB) error {
+	goose.SetBaseFS(migrationsFS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("configurando o goose: %w", err)
+	}
+	if err := goose.Up(db, "migrations"); err != nil {
+		return fmt.Errorf("aplicando migrações: %w", err)
+	}
+	return nil
+}
 func (s *Store) Close() error { return s.db.Close() }
 
 // seedServices insere a tabela de preços padrão apenas se ainda não houver

@@ -3,11 +3,6 @@ node_modules/
 frontend/dist/
 backend/tmp/
 
-# go.sum é gerado dentro do container (go mod tidy no start).
-# Se você instalar o Go localmente, remova esta linha e versione o arquivo —
-# é o certo para builds reproduzíveis.
-backend/go.sum
-
 # Bancos e backups locais
 *.db
 *.db-shm
