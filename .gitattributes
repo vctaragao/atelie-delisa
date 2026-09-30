@@ -1,0 +1,14 @@
+# Normaliza quebras de linha: LF no repositório e no working copy.
+# Importante aqui porque Dockerfiles, nginx.conf e .air.toml são copiados
+# para containers Linux, onde CRLF pode quebrar o build/execução.
+* text=auto eol=lf
+
+# Binários — nunca normalizar.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.db binary

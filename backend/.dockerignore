@@ -1,0 +1,8 @@
+tmp/
+data/
+*.db
+*.db-shm
+*.db-wal
+Dockerfile
+Dockerfile.dev
+.dockerignore

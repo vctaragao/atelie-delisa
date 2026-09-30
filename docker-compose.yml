@@ -1,0 +1,63 @@
+# Ambiente de DESENVOLVIMENTO.
+#
+# O código de backend/ e frontend/ é montado do seu disco para dentro dos
+# containers, então editar um arquivo no Windows recompila/recarrega na hora.
+#
+#   docker compose up            sobe tudo
+#   docker compose up --build    idem, reconstruindo as imagens
+#   docker compose down          para tudo (os dados ficam no volume)
+#
+# Frontend: http://localhost:5173
+# API:      http://localhost:8080/api/health
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      ADDR: ":8080"
+      DB_PATH: /data/atelie.db
+      # Origens liberadas no CORS: o Vite em dev e o nginx em produção.
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8081
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      # O banco fica num volume gerenciado pelo Docker, não num bind mount:
+      # o SQLite depende de travas de arquivo que não funcionam de forma
+      # confiável através do compartilhamento de disco do Docker no Windows.
+      - atelie-data:/data
+      # Caches do Go, para que reiniciar o container não rebaixe nem recompile
+      # tudo de novo.
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 90s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      # Alvo do proxy /api do Vite: o nome do serviço na rede do Compose.
+      VITE_API_TARGET: http://backend:8080
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      # Volume próprio para node_modules: sem isso, o bind mount acima
+      # esconderia os pacotes instalados dentro da imagem.
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  atelie-data:
+  go-mod-cache:
+  go-build-cache:
+  frontend-node-modules:

@@ -1,0 +1,18 @@
+# Imagem de desenvolvimento: recompila e reinicia sozinha quando você salva
+# um arquivo .go. O código vem de um bind mount, não é copiado na imagem.
+FROM golang:1.24-alpine
+
+# git é exigido pelo go install. O resto do build é Go puro (sem CGO), porque
+# modernc.org/sqlite é uma implementação de SQLite em Go.
+RUN apk add --no-cache git
+
+# air observa os arquivos e reinicia o binário a cada alteração.
+RUN go install github.com/air-verse/air@latest
+
+WORKDIR /app
+EXPOSE 8080
+
+# go mod tidy roda a cada start para garantir que o go.sum exista e esteja
+# coerente com o go.mod montado do host. O cache de módulos fica num volume
+# (ver docker-compose.yml), então só a primeira execução baixa as dependências.
+CMD ["sh", "-c", "go mod tidy && air -c .air.toml"]

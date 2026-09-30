@@ -1,0 +1,49 @@
+# Ambiente de PRODUÇÃO (ou de uso do dia a dia no ateliê).
+#
+# Sem hot reload: o frontend é compilado para arquivos estáticos e servido
+# pelo nginx, que também faz proxy de /api para o backend. O backend roda como
+# um binário estático numa imagem mínima.
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml down
+#
+# Acesse: http://localhost:8081
+#
+# O volume atelie-data é o mesmo nome usado em desenvolvimento, mas o Compose
+# prefixa o nome do projeto — use -p para compartilhar os dados entre os dois
+# ambientes, se quiser.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      ADDR: ":8080"
+      DB_PATH: /data/atelie.db
+      # Em produção o navegador fala com o nginx na mesma origem, então o CORS
+      # não é necessário; fica liberado apenas o endereço local.
+      CORS_ORIGINS: http://localhost:8081
+    volumes:
+      - atelie-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  atelie-data:
