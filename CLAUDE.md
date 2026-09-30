@@ -20,7 +20,7 @@ em linguagem comum; escrever o código é seu trabalho. Isso muda algumas coisas
 - **Como ela manda um print:** arrastando o arquivo de imagem para dentro da
   janela do Claude Code, que insere o caminho. `Ctrl+V` não funciona neste
   terminal — não insista nem peça para ela tentar. As capturas do Windows
-  (`Win+PrtScn`) caem em `C:\Users\Maria\OneDrive\Imagens\Capturas de tela\`,
+  (`Win+PrtScn`) caem em `%USERPROFILE%\OneDrive\Imagens\Capturas de tela\`,
   porque o OneDrive assumiu a pasta de imagens. O caminho tem espaços e
   acentos, então arrastar evita erro de digitação.
 
@@ -28,8 +28,8 @@ em linguagem comum; escrever o código é seu trabalho. Isso muda algumas coisas
 
 1. Ela abre o atalho **atelie-delisa-dev** e o sistema sobe com hot reload.
 2. Ela conversa com você e pede funcionalidades ou correções.
-3. Você edita os arquivos em `C:\Users\Maria\atelie-delisa-dev`, e ela vê o
-   resultado na hora no navegador.
+3. Você edita os arquivos na pasta de desenvolvimento, e ela vê o resultado
+   na hora no navegador.
 4. **Quando ela demonstrar que está satisfeita** — "ficou bom", "é isso",
    "pode subir", "agora sim" —, ofereça, numa frase só: rodar os testes,
    commitar, dar push e abrir o PR da `development` para a `main`.
@@ -45,8 +45,8 @@ O repositório está em duas pastas ao mesmo tempo, via `git worktree`:
 
 | Pasta | Branch | Serve para |
 |---|---|---|
-| `C:\Users\Maria\atelie-delisa` | `main` | **produção** — o sistema que o ateliê usa |
-| `C:\Users\Maria\atelie-delisa-dev` | `development` | **desenvolvimento** — onde o trabalho acontece |
+| `%USERPROFILE%\atelie-delisa` | `main` | **produção** — o sistema que o ateliê usa |
+| `%USERPROFILE%\atelie-delisa-dev` | `development` | **desenvolvimento** — onde o trabalho acontece |
 
 São a mesma história do git, com dois diretórios de trabalho. Por isso uma
 branch só pode estar em checkout numa pasta por vez: `git checkout development`
@@ -67,7 +67,7 @@ git branch --show-current
   branch aqui: vá para a pasta de desenvolvimento, que já está na
   `development`:
   ```bash
-  cd C:\Users\Maria\atelie-delisa-dev
+  cd ~/atelie-delisa-dev
   ```
 - Se for uma branch de feature criada a partir da `development` → pode trabalhar.
 
