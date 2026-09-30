@@ -57,7 +57,7 @@
 <div class="toolbar">
   <input
     class="search"
-    placeholder="Buscar cliente por nome ou WhatsApp..."
+    placeholder="Buscar cliente por nome ou telefone..."
     bind:value={query}
   />
   <button class="btn" onclick={() => open(null)}>+ Novo cliente</button>
@@ -67,7 +67,7 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nome</th><th>WhatsApp</th><th>Endereço</th><th>Pedidos</th><th></th></tr>
+        <tr><th>Nome</th><th>Telefone</th><th>Endereço</th><th>Pedidos</th><th></th></tr>
       </thead>
       <tbody>
         {#each filtered as c (c.id)}
@@ -103,7 +103,7 @@
           <input id="cn" bind:value={editing.name} required />
         </div>
         <div class="form-group">
-          <label for="cp">WhatsApp</label>
+          <label for="cp">Telefone</label>
           <input id="cp" bind:value={editing.phone} placeholder="(35) 99999-9999" />
         </div>
       </div>
