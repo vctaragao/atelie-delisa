@@ -72,16 +72,18 @@ if errorlevel 1 (
 
 echo [4/4] Esperando o sistema responder...
 set /a tentativas=0
+REM  O ping abaixo e a forma de esperar N segundos: o timeout.exe
+REM  exige um console e aborta quando o stdin esta redirecionado.
 :aguarda
 set /a tentativas+=1
-curl -s -o nul %URL% >nul 2>&1
+"%SystemRoot%\System32\curl.exe" -s -o nul %URL% >nul 2>&1
 if not errorlevel 1 goto :pronto
 if !tentativas! geq 90 (
   echo [AVISO] O sistema nao respondeu em 3 minutos.
   echo         Veja os logs: docker compose -p %PROJETO% logs
   goto :falhou
 )
-timeout /t 2 >nul
+"%SystemRoot%\System32\ping.exe" -n 3 127.0.0.1 >nul
 goto :aguarda
 
 :pronto
@@ -98,7 +100,7 @@ echo.
 echo   Para parar:  docker compose -p %PROJETO% down
 echo.
 start "" %URL%
-timeout /t 8 >nul
+"%SystemRoot%\System32\ping.exe" -n 9 127.0.0.1 >nul
 exit /b 0
 
 :falhou

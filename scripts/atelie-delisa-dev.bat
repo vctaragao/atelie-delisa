@@ -55,7 +55,7 @@ if /i not "!BRANCH!"=="development" (
   echo [AVISO] Esta pasta nao esta na development, e sim na "!BRANCH!".
   echo         Se isso nao foi proposital, feche esta janela agora.
   echo.
-  timeout /t 5 >nul
+"%SystemRoot%\System32\ping.exe" -n 6 127.0.0.1 >nul
 )
 
 echo [2/3] Construindo as imagens e subindo os containers...
@@ -67,16 +67,18 @@ if errorlevel 1 (
 
 echo [3/3] Esperando o Vite responder...
 set /a tentativas=0
+REM  O ping abaixo e a forma de esperar N segundos: o timeout.exe
+REM  exige um console e aborta quando o stdin esta redirecionado.
 :aguarda
 set /a tentativas+=1
-curl -s -o nul %URL% >nul 2>&1
+"%SystemRoot%\System32\curl.exe" -s -o nul %URL% >nul 2>&1
 if not errorlevel 1 goto :pronto
 if !tentativas! geq 120 (
   echo [AVISO] O site nao respondeu em 4 minutos.
   echo         Veja os logs: docker compose -p %PROJETO% logs
   goto :falhou
 )
-timeout /t 2 >nul
+"%SystemRoot%\System32\ping.exe" -n 3 127.0.0.1 >nul
 goto :aguarda
 
 :pronto
@@ -92,7 +94,7 @@ echo   Ctrl+C  para de mostrar o log, mas os containers CONTINUAM
 echo           rodando e o hot reload segue funcionando.
 echo   Para parar de verdade:  docker compose -p %PROJETO% down
 echo.
-timeout /t 3 >nul
+"%SystemRoot%\System32\ping.exe" -n 4 127.0.0.1 >nul
 docker compose -p %PROJETO% logs -f
 exit /b 0
 
