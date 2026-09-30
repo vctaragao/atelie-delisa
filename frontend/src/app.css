@@ -3,6 +3,8 @@
   --teal2: #075858;
   --blue: #a9dce8;
   --gold: #c9a45c;
+  --aviso: #e6a532;
+  --aviso-escuro: #8a5a00;
   --bg: #f5f5f2;
   --card: #fff;
   --text: #202525;
@@ -318,4 +320,41 @@ label {
   .topbar { align-items: flex-start; flex-direction: column; }
   .topbar h1 { font-size: 23px; }
   .service-row { grid-template-columns: 1fr 1fr; }
+}
+
+/* Ambiente de teste.
+   A marcação que usa estas classes só é renderizada com `vite dev` — em
+   produção o `import.meta.env.DEV` é false e nada aparece. As regras em si
+   acompanham o bundle, sem uso: CSS não é removido por condicional de JS.
+   Existe para que a cópia de teste não seja confundida com o sistema que o
+   ateliê usa de verdade — as duas rodam no mesmo navegador, em portas
+   diferentes, e a diferença de porta ninguém repara. */
+.faixa-teste {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  z-index: 100;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--aviso) 0 10px,
+    var(--aviso-escuro) 10px 20px
+  );
+}
+
+.selo-teste {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  /* Texto branco pede fundo escuro: branco sobre o ambar claro daria
+     2,1:1 de contraste, abaixo de qualquer limiar de legibilidade. */
+  background: var(--aviso-escuro);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: help;
 }
