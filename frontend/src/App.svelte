@@ -17,6 +17,14 @@
     { id: 'backup', icon: '↕', label: 'Backup', title: 'Backup', subtitle: 'Proteja os dados do seu ateliê', component: Backup },
   ]
 
+  // O Vite define DEV como true em `vite dev` e false em `vite build`.
+  // É o que separa esta cópia de teste do sistema que o ateliê usa.
+  const ambienteDeTeste = import.meta.env.DEV
+
+  // Título absoluto, e não um prefixo: com hot reload isto roda de novo, e
+  // um prefixo acabaria repetido na aba.
+  if (ambienteDeTeste) document.title = 'TESTE — Ateliê Delisa'
+
   let current = $state('dashboard')
   let newOrder = $state(false)
 
@@ -38,11 +46,23 @@
   }
 </script>
 
+{#if ambienteDeTeste}
+  <div class="faixa-teste" aria-hidden="true"></div>
+{/if}
+
 <div class="app">
   <aside class="sidebar">
     <div class="logo">
       <small>Gestão do</small>
       <strong>Ateliê <span>Delisa</span></strong>
+      {#if ambienteDeTeste}
+        <span
+          class="selo-teste"
+          title="Você está no ambiente de teste. Nada aqui altera os dados reais do ateliê."
+        >
+          Ambiente de teste
+        </span>
+      {/if}
     </div>
     <nav class="nav">
       {#each pages as p (p.id)}
