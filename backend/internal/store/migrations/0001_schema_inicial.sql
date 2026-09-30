@@ -1,3 +1,10 @@
+-- Migração 0001 — estado inicial do banco.
+--
+-- Era a antiga schema.sql, aplicada inteira a cada start. Virou a primeira
+-- migração do goose: como tudo aqui usa IF NOT EXISTS, aplicá-la a um banco
+-- que já tinha essas tabelas é inofensivo.
+
+-- +goose Up
 CREATE TABLE IF NOT EXISTS clients (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL,
@@ -61,3 +68,14 @@ SELECT o.id AS order_id,
 FROM orders o
 LEFT JOIN order_items i ON i.order_id = o.id
 GROUP BY o.id;
+
+-- +goose Down
+DROP VIEW IF EXISTS order_totals;
+DROP INDEX IF EXISTS idx_order_items_order;
+DROP INDEX IF EXISTS idx_orders_due;
+DROP INDEX IF EXISTS idx_orders_client;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS services;
+DROP TABLE IF EXISTS clients;
