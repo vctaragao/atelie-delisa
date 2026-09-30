@@ -39,7 +39,8 @@ Numa conta de usuário nova do Windows, duas coisas costumam passar batido:
 - O Docker Desktop precisa ser aberto **uma vez** nessa conta, para montar a
   máquina virtual dele. Ele mantém uma instalação separada por conta de
   usuário, e é por isso que os dados do ateliê não atravessam a troca de conta
-  sozinhos (ver o passo 5).
+  sozinhos. Numa primeira instalação isso é indiferente, porque não há dados
+  ainda; mudando de máquina com o ateliê em uso, ver o passo 5.
 
 O instalador nativo do Claude Code coloca o executável em
 `%USERPROFILE%\.local\bin\claude.exe`, que é onde o atalho de chat procura.
@@ -144,11 +145,16 @@ Na máquina da Maria os três atalhos têm nomes antigos e diferentes destes
 (`atelie-delisa`, `[dev]atelie-delisa` e `Claude CLI`). Numa instalação nova
 vale usar os nomes acima, que são os que o `CLAUDE.md` cita.
 
-### 5. Levar os dados do ateliê para a conta nova
+### 5. Levar os dados do ateliê, se houver dados a levar
 
-O volume de produção **não acompanha a troca de conta de usuário**: o Docker
-Desktop mantém uma instalação por conta, e a produção da conta nova nasce com
-o banco vazio. Os dados reais vão pela tela de **Backup**:
+**Numa primeira instalação não há o que fazer aqui.** O banco nasce vazio, as
+migrações criam as tabelas no primeiro start e o ateliê começa a cadastrar do
+zero. Pule para o passo 6.
+
+Este passo vale quando a produção já estava em uso em outro lugar. Nesse caso,
+o volume **não acompanha a troca de conta de usuário**: o Docker Desktop mantém
+uma instalação por conta, e a produção da conta nova nasce vazia mesmo havendo
+dados na antiga. Eles vão pela tela de **Backup**:
 
 1. Na conta antiga, abra a produção e exporte na tela de Backup. Sai um
    arquivo `.json` com clientes, serviços, pedidos e lançamentos.
