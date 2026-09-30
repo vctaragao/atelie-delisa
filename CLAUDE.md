@@ -17,6 +17,12 @@ em linguagem comum; escrever o código é seu trabalho. Isso muda algumas coisas
   Quando o que ela pediu tiver esse risco, diga antes de fazer.
 - Erro que aparecer na tela dela é problema seu para investigar, não para ela
   interpretar. Peça o print ou leia o log do container.
+- **Como ela manda um print:** arrastando o arquivo de imagem para dentro da
+  janela do Claude Code, que insere o caminho. `Ctrl+V` não funciona neste
+  terminal — não insista nem peça para ela tentar. As capturas do Windows
+  (`Win+PrtScn`) caem em `C:\Users\Maria\OneDrive\Imagens\Capturas de tela\`,
+  porque o OneDrive assumiu a pasta de imagens. O caminho tem espaços e
+  acentos, então arrastar evita erro de digitação.
 
 ## O ciclo de trabalho
 
@@ -173,6 +179,7 @@ frontend/
   src/routes/                 telas (Dashboard, Clientes, Ordens, ...)
   src/lib/                    api client, helpers de formatação, componentes
 scripts/
+  atelie-delisa-chat.bat      abre este chat na pasta de desenvolvimento
   atelie-delisa-dev.bat       sobe o ambiente de desenvolvimento
   atelie-delisa-prod.bat      atualiza a main e sobe a produção
 ```
