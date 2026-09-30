@@ -180,6 +180,7 @@ frontend/
   src/lib/                    api client, helpers de formatação, componentes
 scripts/
   atelie-delisa-chat.bat      abre este chat na pasta de desenvolvimento
+  boas-vindas.md              o que fazer ao abrir o chat, lido por ele
   atelie-delisa-dev.bat       sobe o ambiente de desenvolvimento
   atelie-delisa-prod.bat      atualiza a main e sobe a produção
 ```

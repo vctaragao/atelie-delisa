@@ -55,7 +55,9 @@ if not defined ATIVOS (
   echo.
 )
 
-"!CLAUDE!"
+REM  O prompt inicial mora em scripts/boas-vindas.md, e nao aqui: a
+REM  saudacao tem acentos, e este arquivo precisa seguir em ASCII puro.
+"!CLAUDE!" "Leia o arquivo scripts/boas-vindas.md e siga as instrucoes que ele traz."
 set "RC=!errorlevel!"
 if not "!RC!"=="0" (
   echo.
