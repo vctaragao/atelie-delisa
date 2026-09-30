@@ -1,13 +1,15 @@
 # Imagem de desenvolvimento: recompila e reinicia sozinha quando você salva
 # um arquivo .go. O código vem de um bind mount, não é copiado na imagem.
-FROM golang:1.24-alpine
+FROM golang:1.26-alpine
 
 # git é exigido pelo go install. O resto do build é Go puro (sem CGO), porque
 # modernc.org/sqlite é uma implementação de SQLite em Go.
 RUN apk add --no-cache git
 
 # air observa os arquivos e reinicia o binário a cada alteração.
-RUN go install github.com/air-verse/air@latest
+# Versao pinada: air@latest quebra o build sempre que o air passa a exigir
+# um Go mais novo que o da imagem acima. Ao subir o air, suba o golang junto.
+RUN go install github.com/air-verse/air@v1.67.4
 
 WORKDIR /app
 EXPOSE 8080

@@ -3,6 +3,12 @@
 # para containers Linux, onde CRLF pode quebrar o build/execução.
 * text=auto eol=lf
 
+# Scripts do Windows são a exceção: PRECISAM de CRLF, porque o cmd.exe
+# pode falhar ao interpretar labels e goto em arquivos salvos com LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
 # Binários — nunca normalizar.
 *.png binary
 *.jpg binary
