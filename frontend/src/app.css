@@ -358,3 +358,125 @@ label {
   text-transform: uppercase;
   cursor: help;
 }
+
+/* Comprovante do pedido, no formato de cupom da impressora térmica.
+   Não é nota fiscal: o ateliê não emite documento fiscal, e o próprio papel
+   diz isso. Serve para o cliente levar o que foi acordado por escrito.
+
+   A bobina é de 58 mm, mas a cabeça de impressão cobre só cerca de 48 mm.
+   Daí as medidas: 54 mm de papel com 3 mm de folga de cada lado deixam o
+   texto dentro dos 48 mm que a impressora alcança. Passar disso corta a
+   borda direita, e o corte não aparece na pré-visualização do navegador.
+
+   Sem cor de fundo, sem cinza e sem borda fina: a térmica só marca preto,
+   e o que não é preto sai como nada ou como um borrão. Os separadores são
+   tracejados de texto, que é o que esse tipo de papel imprime bem. */
+.comprovante {
+  width: 54mm;
+  margin: 0 auto;
+  padding: 3mm;
+  box-sizing: border-box;
+  /* Monoespaçada para os valores ficarem alinhados na coluna da direita. */
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9pt;
+  line-height: 1.4;
+  color: #000;
+  /* Nome de peça comprido quebra em vez de alargar o cupom. */
+  overflow-wrap: break-word;
+  /* Na tela, marca onde acaba o papel. Some na impressão. */
+  border: 1px solid var(--border);
+}
+
+.comprovante-topo { text-align: center; margin-bottom: 2mm; }
+.comprovante-topo strong {
+  display: block;
+  font-size: 12pt;
+  letter-spacing: 1px;
+}
+.comprovante-topo span { display: block; font-size: 8pt; }
+
+.comprovante-sep {
+  border: 0;
+  border-top: 1px dashed #000;
+  margin: 2mm 0;
+}
+
+.comprovante-pedido {
+  text-align: center;
+  font-size: 11pt;
+  font-weight: 700;
+  margin-bottom: 2mm;
+}
+
+/* Rótulo e valor na mesma linha, valor encostado à direita. Quando não cabe,
+   o valor desce para a linha de baixo em vez de estourar a largura. */
+.comprovante-linha {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  flex-wrap: wrap;
+}
+.comprovante-linha span:last-child { text-align: right; }
+
+.comprovante-item { margin-bottom: 1.5mm; }
+.comprovante-item-nome { display: block; }
+/* A conta do item (2 x 25,00 ... 50,00) recuada, para o nome se destacar. */
+.comprovante-item .comprovante-linha { padding-left: 3mm; }
+
+.comprovante-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  font-size: 11pt;
+  font-weight: 700;
+}
+
+.comprovante-obs { margin-top: 1mm; }
+.comprovante-obs strong { display: block; }
+
+.comprovante-pe { text-align: center; font-size: 7.5pt; }
+.comprovante-pe p { margin: 0 0 1mm; }
+
+@media print {
+  /* A bobina não tem altura fixa: `auto` faz o cupom sair do tamanho que
+     precisar, sem paginar nem cuspir papel em branco no fim. */
+  @page { size: 58mm auto; margin: 0; }
+
+  body { background: #fff; }
+
+  /* O comprovante é renderizado dentro de .main, junto com a tela de ordens.
+     Por isso não se pode esconder .app nem .main com display:none — isso
+     levaria o comprovante embora e a folha sairia em branco. Esconde-se a
+     moldura (barra lateral, cabeçalho, avisos) e o conteúdo da tela
+     (.toolbar e .card, os invólucros que toda tela usa). */
+  .faixa-teste,
+  .sidebar,
+  .topbar,
+  .notice,
+  .toolbar,
+  .card,
+  .modal-head,
+  .modal-foot { display: none !important; }
+
+  /* Sem isto o espaço da barra lateral e a altura de tela cheia continuariam
+     reservados, deslocando o cupom e gerando papel em branco. */
+  .app { display: block; min-height: 0; }
+  .main { margin-left: 0; width: auto; padding: 0; }
+
+  .modal-bg {
+    position: static;
+    display: block;
+    background: none;
+    padding: 0;
+  }
+  .modal {
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .comprovante { border: 0; margin: 0; }
+  .comprovante-item { break-inside: avoid; }
+}
