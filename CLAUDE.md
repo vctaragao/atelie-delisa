@@ -183,6 +183,8 @@ scripts/
   boas-vindas.md              o que fazer ao abrir o chat, lido por ele
   atelie-delisa-dev.bat       sobe o ambiente de desenvolvimento
   atelie-delisa-prod.bat      atualiza a main e sobe a produção
+  icones/                     os .ico dos atalhos, com os fontes e como
+                              gerá-los de novo (ver icones/README.md)
 ```
 
 ## Detalhes que economizam tempo

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Chat: a marca do Claude Code, na cor dela, sobre o mesmo quadrado
+       arredondado dos outros dois, para os tres lerem como um conjunto.
+       O glifo original vem num viewBox 24x24 mas ocupa y de 5 a 20, ou seja,
+       nao e quadrado. A transformacao abaixo centra pela caixa real do
+       desenho; centrar pelo viewBox o deslocaria para baixo. -->
+  <rect width="256" height="256" rx="52" fill="#003e3e"/>
+  <g transform="translate(46, 42.58) scale(6.8333)">
+    <path clip-rule="evenodd"
+          d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z"
+          fill="#D97757"
+          fill-rule="evenodd" />
+  </g>
+</svg>
