@@ -18,7 +18,12 @@ REM  Sem acentos de proposito: o cmd.exe erra ao interpretar
 REM  caracteres multibyte em arquivos .bat.
 REM =================================================================
 
-set "REPO=C:\Users\Maria\atelie-delisa-dev"
+REM  A pasta do repositorio e descoberta a partir da localizacao deste
+REM  arquivo: ele vive em <repo>\scripts\, entao o repo e o diretorio
+REM  acima. Assim o script funciona em qualquer conta de usuario, sem
+REM  nome de pasta escrito dentro dele. O `for` expande o ".." para o
+REM  caminho absoluto, para as mensagens na tela nao mostrarem o "..".
+for %%i in ("%~dp0..") do set "REPO=%%~fi"
 set "PROJETO=atelie-delisa-dev"
 set "URL=http://localhost:5173"
 set "API=http://localhost:8080/api/health"

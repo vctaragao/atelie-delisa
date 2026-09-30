@@ -10,11 +10,21 @@ REM
 REM  Dados: volume "atelie-delisa-prod_atelie-data".
 REM  Esses sao os dados REAIS do atelie - nunca apague esse volume.
 REM
+REM  O atalho precisa apontar para a copia deste arquivo que
+REM  esta na pasta de PRODUCAO, a da branch main. A pasta vem da
+REM  localizacao do arquivo, entao a copia da pasta de
+REM  desenvolvimento subiria producao a partir da development.
+REM
 REM  Sem acentos de proposito: o cmd.exe erra ao interpretar
 REM  caracteres multibyte em arquivos .bat.
 REM =================================================================
 
-set "REPO=C:\Users\Maria\atelie-delisa"
+REM  A pasta do repositorio e descoberta a partir da localizacao deste
+REM  arquivo: ele vive em <repo>\scripts\, entao o repo e o diretorio
+REM  acima. Assim o script funciona em qualquer conta de usuario, sem
+REM  nome de pasta escrito dentro dele. O `for` expande o ".." para o
+REM  caminho absoluto, para as mensagens na tela nao mostrarem o "..".
+for %%i in ("%~dp0..") do set "REPO=%%~fi"
 set "PROJETO=atelie-delisa-prod"
 set "URL=http://localhost:8081"
 
@@ -34,7 +44,7 @@ if errorlevel 1 (
   goto :falhou
 )
 
-echo [1/4] Conferindo o Docker...
+echo [1/5] Conferindo o Docker...
 docker info >nul 2>&1
 if errorlevel 1 (
   echo [ERRO] O Docker Desktop nao esta rodando.
@@ -42,16 +52,19 @@ if errorlevel 1 (
   goto :falhou
 )
 
-echo [2/4] Buscando a ultima versao da main...
+echo [2/5] Conferindo a pasta...
+for /f "delims=" %%b in ('git branch --show-current') do set "BRANCH=%%b"
+if /i not "!BRANCH!"=="main" (
+  echo [ERRO] Esta pasta esta na branch "!BRANCH!", e nao na main.
+  echo        Producao roda a partir da pasta da main. Confira se o
+  echo        atalho aponta para o script que esta nessa pasta.
+  goto :falhou
+)
+
+echo [3/5] Buscando a ultima versao da main...
 git fetch origin main
 if errorlevel 1 (
   echo [ERRO] Falha ao buscar do GitHub. Sem internet ou sem credencial?
-  goto :falhou
-)
-git checkout main
-if errorlevel 1 (
-  echo [ERRO] Nao foi possivel mudar para a main.
-  echo        Ha alteracoes pendentes nesta pasta?
   goto :falhou
 )
 git merge --ff-only origin/main
@@ -63,14 +76,14 @@ if errorlevel 1 (
 echo       Versao que vai subir:
 git log -1 --oneline
 
-echo [3/4] Construindo as imagens e subindo os containers...
+echo [4/5] Construindo as imagens e subindo os containers...
 docker compose -p %PROJETO% -f docker-compose.prod.yml up -d --build
 if errorlevel 1 (
   echo [ERRO] Falha ao subir os containers. Veja as mensagens acima.
   goto :falhou
 )
 
-echo [4/4] Esperando o sistema responder...
+echo [5/5] Esperando o sistema responder...
 set /a tentativas=0
 REM  O ping abaixo e a forma de esperar N segundos: o timeout.exe
 REM  exige um console e aborta quando o stdin esta redirecionado.
