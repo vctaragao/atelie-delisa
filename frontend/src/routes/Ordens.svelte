@@ -1,5 +1,6 @@
 <script>
   import OrderModal from './OrderModal.svelte'
+  import Comprovante from './Comprovante.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
   import { money, fmtDate, statusClass, ORDER_STATUSES } from '../lib/format.js'
@@ -8,6 +9,7 @@
   let statusFilter = $state('')
   let editing = $state(null)
   let creating = $state(false)
+  let printing = $state(null)
 
   const filtered = $derived.by(() => {
     const q = query.trim().toLowerCase()
@@ -82,6 +84,9 @@
             <td>
               <div class="actions">
                 <button class="btn light small" onclick={() => (editing = o)}>Editar</button>
+                <button class="btn light small" onclick={() => (printing = o)}>
+                  Comprovante
+                </button>
                 <button class="btn danger small" onclick={() => remove(o)}>Excluir</button>
               </div>
             </td>
@@ -100,4 +105,8 @@
 
 {#if editing}
   <OrderModal order={editing} onclose={() => (editing = null)} />
+{/if}
+
+{#if printing}
+  <Comprovante order={printing} onclose={() => (printing = null)} />
 {/if}
