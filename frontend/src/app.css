@@ -363,79 +363,33 @@ label {
    Não é nota fiscal: o ateliê não emite documento fiscal, e o próprio papel
    diz isso. Serve para o cliente levar o que foi acordado por escrito.
 
-   A bobina é de 58 mm, mas a cabeça de impressão cobre só cerca de 48 mm.
-   Daí as medidas: 54 mm de papel com 3 mm de folga de cada lado deixam o
-   texto dentro dos 48 mm que a impressora alcança. Passar disso corta a
-   borda direita, e o corte não aparece na pré-visualização do navegador.
+   O cupom chega aqui pronto, como texto puro montado em lib/cupom.js com os
+   espaços de alinhamento já contados. Este bloco só escolhe a fonte e o
+   tamanho; nenhum alinhamento é feito por CSS, porque o driver da impressora
+   ("Generic / Text Only") descarta posicionamento e imprime só o texto.
+
+   A bobina é de 58 mm, mas a cabeça de impressão cobre cerca de 48 mm. Em
+   'Courier New' cada caractere ocupa 0,6 do tamanho da fonte, então 7pt dão
+   1,48 mm por caractere e as 32 colunas do cupom somam 47,4 mm — dentro do
+   que a impressora alcança. Aumentar a fonte estoura a borda direita, e o
+   corte não aparece na pré-visualização do navegador.
 
    Sem cor de fundo, sem cinza e sem borda fina: a térmica só marca preto,
-   e o que não é preto sai como nada ou como um borrão. Os separadores são
-   tracejados de texto, que é o que esse tipo de papel imprime bem. */
+   e o que não é preto sai como nada ou como um borrão. */
 .comprovante {
-  width: 54mm;
+  width: 48mm;
   margin: 0 auto;
   padding: 3mm;
-  box-sizing: border-box;
-  /* Monoespaçada para os valores ficarem alinhados na coluna da direita. */
+  box-sizing: content-box;
   font-family: 'Courier New', Courier, monospace;
-  font-size: 9pt;
-  line-height: 1.4;
+  font-size: 7pt;
+  line-height: 1.35;
+  /* Os espaços e as quebras de linha do texto são o layout: preservá-los. */
+  white-space: pre;
   color: #000;
-  /* Nome de peça comprido quebra em vez de alargar o cupom. */
-  overflow-wrap: break-word;
   /* Na tela, marca onde acaba o papel. Some na impressão. */
   border: 1px solid var(--border);
 }
-
-.comprovante-topo { text-align: center; margin-bottom: 2mm; }
-.comprovante-topo strong {
-  display: block;
-  font-size: 12pt;
-  letter-spacing: 1px;
-}
-.comprovante-topo span { display: block; font-size: 8pt; }
-
-.comprovante-sep {
-  border: 0;
-  border-top: 1px dashed #000;
-  margin: 2mm 0;
-}
-
-.comprovante-pedido {
-  text-align: center;
-  font-size: 11pt;
-  font-weight: 700;
-  margin-bottom: 2mm;
-}
-
-/* Rótulo e valor na mesma linha, valor encostado à direita. Quando não cabe,
-   o valor desce para a linha de baixo em vez de estourar a largura. */
-.comprovante-linha {
-  display: flex;
-  justify-content: space-between;
-  gap: 2mm;
-  flex-wrap: wrap;
-}
-.comprovante-linha span:last-child { text-align: right; }
-
-.comprovante-item { margin-bottom: 1.5mm; }
-.comprovante-item-nome { display: block; }
-/* A conta do item (2 x 25,00 ... 50,00) recuada, para o nome se destacar. */
-.comprovante-item .comprovante-linha { padding-left: 3mm; }
-
-.comprovante-total {
-  display: flex;
-  justify-content: space-between;
-  gap: 2mm;
-  font-size: 11pt;
-  font-weight: 700;
-}
-
-.comprovante-obs { margin-top: 1mm; }
-.comprovante-obs strong { display: block; }
-
-.comprovante-pe { text-align: center; font-size: 7.5pt; }
-.comprovante-pe p { margin: 0 0 1mm; }
 
 @media print {
   /* A bobina não tem altura fixa: `auto` faz o cupom sair do tamanho que
@@ -477,6 +431,7 @@ label {
     padding: 0;
   }
 
-  .comprovante { border: 0; margin: 0; }
-  .comprovante-item { break-inside: avoid; }
+  /* Sem a folga lateral da tela: o driver conta as colunas a partir da borda
+     esquerda do papel, e qualquer recuo aqui empurraria o texto para fora. */
+  .comprovante { border: 0; margin: 0; padding: 0; }
 }
