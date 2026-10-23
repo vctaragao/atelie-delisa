@@ -25,7 +25,12 @@ export async function refresh() {
       api.summary(),
     ])
     data.clients = clients
-    data.services = services
+    // A ordem alfabética dos serviços é aplicada aqui, uma vez só, para valer
+    // em todo lugar onde eles aparecem: a tabela de preços e o seletor do
+    // pedido. O banco já devolve ordenado, mas o COLLATE NOCASE do SQLite não
+    // conhece acentos — "Órfão" iria para depois do Z. O localeCompare em
+    // pt-BR trata o acento como a letra sem acento, que é o esperado.
+    data.services = [...services].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
     data.orders = orders
     data.transactions = transactions
     data.messages = messages
