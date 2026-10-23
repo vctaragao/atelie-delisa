@@ -301,6 +301,100 @@ func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 	return true
 }
 
+// ---------- mensagens do WhatsApp ----------
+
+func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {
+	list, err := s.st.ListMessages()
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (s *Server) createMessage(w http.ResponseWriter, r *http.Request) {
+	var in store.MessageTemplate
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if !validateMessage(w, &in) {
+		return
+	}
+	out, err := s.st.CreateMessage(in)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (s *Server) updateMessage(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in store.MessageTemplate
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if !validateMessage(w, &in) {
+		return
+	}
+	out, err := s.st.UpdateMessage(id, in)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) deleteMessage(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	if err := s.st.DeleteMessage(id); err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusNoContent, nil)
+}
+
+func (s *Server) restoreMessages(w http.ResponseWriter, r *http.Request) {
+	if err := s.st.RestoreMessages(); err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	list, err := s.st.ListMessages()
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func validateMessage(w http.ResponseWriter, m *store.MessageTemplate) bool {
+	m.Name = strings.TrimSpace(m.Name)
+	m.Body = strings.TrimSpace(m.Body)
+	m.SuggestStatus = strings.TrimSpace(m.SuggestStatus)
+
+	if m.Name == "" {
+		writeErr(w, http.StatusUnprocessableEntity, "Dê um nome à mensagem.")
+		return false
+	}
+	if m.Body == "" {
+		writeErr(w, http.StatusUnprocessableEntity, "Escreva o texto da mensagem.")
+		return false
+	}
+	// Vazio é válido: a mensagem existe na lista, mas não é sugerida sozinha.
+	if m.SuggestStatus != "" && !store.ValidStatus(m.SuggestStatus) {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"Situação inválida. Use uma destas: "+strings.Join(store.OrderStatuses, ", ")+".")
+		return false
+	}
+	return true
+}
+
 // ---------- lançamentos financeiros ----------
 
 func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {

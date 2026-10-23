@@ -7,6 +7,7 @@
   import Financeiro from './routes/Financeiro.svelte'
   import Relatorios from './routes/Relatorios.svelte'
   import Servicos from './routes/Servicos.svelte'
+  import Mensagens from './routes/Mensagens.svelte'
   import Backup from './routes/Backup.svelte'
   import OrderModal from './routes/OrderModal.svelte'
 
@@ -22,6 +23,7 @@
     { id: 'financeiro', icon: 'R$', label: 'Financeiro', title: 'Financeiro', subtitle: 'Entradas, saídas e valores a receber', component: Financeiro },
     { id: 'relatorios', icon: '◱', label: 'Relatórios', title: 'Relatórios', subtitle: 'O fechamento de um período do ateliê', component: Relatorios },
     { id: 'servicos', icon: '☷', label: 'Serviços', title: 'Serviços', subtitle: 'Sua tabela de preços', component: Servicos, botaoProprio: true },
+    { id: 'mensagens', icon: '✉', label: 'Mensagens', title: 'Mensagens', subtitle: 'Os textos prontos para avisar as clientes no WhatsApp', component: Mensagens, botaoProprio: true },
     { id: 'backup', icon: '↕', label: 'Backup', title: 'Backup', subtitle: 'Proteja os dados do seu ateliê', component: Backup },
   ]
 

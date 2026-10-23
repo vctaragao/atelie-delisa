@@ -42,6 +42,9 @@ func Open(path string) (*Store, error) {
 	if err := s.seedServices(); err != nil {
 		return nil, fmt.Errorf("populando serviços iniciais: %w", err)
 	}
+	if err := s.seedMessages(); err != nil {
+		return nil, fmt.Errorf("populando mensagens iniciais: %w", err)
+	}
 	return s, nil
 }
 

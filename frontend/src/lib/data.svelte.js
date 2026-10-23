@@ -7,6 +7,7 @@ export const data = $state({
   services: [],
   orders: [],
   transactions: [],
+  messages: [],
   summary: null,
   loading: true,
   error: null,
@@ -15,17 +16,19 @@ export const data = $state({
 /** Recarrega tudo da API. É chamado no início e após cada alteração. */
 export async function refresh() {
   try {
-    const [clients, services, orders, transactions, summary] = await Promise.all([
+    const [clients, services, orders, transactions, messages, summary] = await Promise.all([
       api.listClients(),
       api.listServices(),
       api.listOrders(),
       api.listTransactions(),
+      api.listMessages(),
       api.summary(),
     ])
     data.clients = clients
     data.services = services
     data.orders = orders
     data.transactions = transactions
+    data.messages = messages
     data.summary = summary
     data.error = null
   } catch (err) {

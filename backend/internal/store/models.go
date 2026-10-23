@@ -78,13 +78,17 @@ type Summary struct {
 }
 
 // Backup é o formato de exportação/importação em JSON.
+//
+// Messages chegou depois e pode faltar num arquivo antigo: nesse caso a
+// restauração deixa as mensagens atuais como estão, em vez de apagá-las.
 type Backup struct {
-	Version      int           `json:"version"`
-	ExportedAt   string        `json:"exportedAt"`
-	Clients      []Client      `json:"clients"`
-	Services     []Service     `json:"services"`
-	Orders       []Order       `json:"orders"`
-	Transactions []Transaction `json:"transactions"`
+	Version      int               `json:"version"`
+	ExportedAt   string            `json:"exportedAt"`
+	Clients      []Client          `json:"clients"`
+	Services     []Service         `json:"services"`
+	Orders       []Order           `json:"orders"`
+	Transactions []Transaction     `json:"transactions"`
+	Messages     []MessageTemplate `json:"messages"`
 }
 
 // OrderStatuses são os únicos status aceitos, na ordem em que aparecem na UI.
@@ -153,4 +157,18 @@ type Report struct {
 	TopServices []ReportService `json:"topServices"`
 	TopClients  []ReportClient  `json:"topClients"`
 	ByStatus    []ReportStatus  `json:"byStatus"`
+}
+
+// MessageTemplate é uma mensagem pronta do WhatsApp, escrita pela Maria.
+//
+// Body aceita apelidos entre chaves — {cliente}, {pedido}, {servicos},
+// {total}, {entrega} — trocados pelos dados do pedido na hora de abrir a
+// conversa. SuggestStatus liga a mensagem a uma situação do pedido: vazio
+// significa que ela não é escolhida sozinha.
+type MessageTemplate struct {
+	ID            int64  `json:"id"`
+	Name          string `json:"name"`
+	Body          string `json:"body"`
+	SuggestStatus string `json:"suggestStatus"`
+	Position      int64  `json:"position"`
 }
