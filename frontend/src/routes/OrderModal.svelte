@@ -1,7 +1,7 @@
 <script>
   import Modal from '../lib/Modal.svelte'
   import { api } from '../lib/api.js'
-  import { data, mutate } from '../lib/data.svelte.js'
+  import { data, mutate, refresh } from '../lib/data.svelte.js'
   import {
     money,
     toCents,
@@ -109,6 +109,58 @@
   let saving = $state(false)
   let formError = $state(null)
 
+  /* Cadastro da cliente sem sair do pedido. A cliente nova chega no balcão
+     junto com a peça; mandar a Maria até a tela de Clientes e voltar faria
+     ela perder o que já tinha digitado aqui.
+     novoCliente: null = fechado. */
+  let novoCliente = $state(null)
+  let salvandoCliente = $state(false)
+  let erroCliente = $state(null)
+  let campoNomeCliente = $state(null)
+
+  function abrirNovoCliente() {
+    erroCliente = null
+    novoCliente = { name: '', phone: '', address: '' }
+    // Deixa o cursor no nome, para ela já começar a digitar.
+    requestAnimationFrame(() => campoNomeCliente?.focus())
+  }
+
+  async function salvarNovoCliente() {
+    erroCliente = null
+    const name = novoCliente.name.trim()
+    if (!name) {
+      erroCliente = 'Escreva o nome da cliente.'
+      campoNomeCliente?.focus()
+      return
+    }
+
+    salvandoCliente = true
+    try {
+      const criada = await api.createClient({
+        name,
+        phone: novoCliente.phone.trim(),
+        address: novoCliente.address.trim(),
+        notes: '',
+      })
+      await refresh()
+      // Já escolhida no pedido: foi para isso que ela cadastrou aqui.
+      form.clientId = criada.id
+      novoCliente = null
+    } catch (err) {
+      erroCliente = err.message
+    } finally {
+      salvandoCliente = false
+    }
+  }
+
+  /* Enter dentro do cadastro salva a cliente. Sem isto o Enter chegaria ao
+     formulário do pedido e tentaria salvar o pedido pela metade. */
+  function teclaNoCadastro(event) {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    salvarNovoCliente()
+  }
+
   // A conta mostrada aqui segue a mesma regra do banco: desconto e urgência
   // sobre o subtotal dos serviços.
   const conta = $derived(
@@ -168,6 +220,17 @@
     event.preventDefault()
     formError = null
 
+    // Cadastro aberto e não salvo: avisa em vez de engolir o que ela digitou.
+    if (novoCliente) {
+      formError = 'Salve ou cancele o cadastro da cliente antes de salvar o pedido.'
+      return
+    }
+
+    if (!Number(form.clientId)) {
+      formError = 'Escolha a cliente do pedido, ou cadastre uma nova.'
+      return
+    }
+
     const items = servicosDoFormulario().filter((i) => i.qty > 0)
 
     if (items.length === 0) {
@@ -211,17 +274,99 @@
     <div class="grid2">
       <div class="form-group">
         <label for="oc">Cliente *</label>
-        <select id="oc" bind:value={form.clientId} required>
-          {#each data.clients as c (c.id)}
-            <option value={c.id}>{c.name}</option>
-          {/each}
-        </select>
+        <div class="cliente-campo">
+          <!-- A opção 0 é o lugar onde o <select> para quando ainda não há
+               nenhuma cliente cadastrada; a validação do envio cobre ela. -->
+          <select id="oc" bind:value={form.clientId}>
+            <option value={0}>— escolha a cliente —</option>
+            {#each data.clients as c (c.id)}
+              <option value={c.id}>{c.name}</option>
+            {/each}
+          </select>
+          {#if !novoCliente}
+            <button type="button" class="btn light small" onclick={abrirNovoCliente}>
+              + Cadastrar
+            </button>
+          {/if}
+        </div>
       </div>
       <div class="form-group">
         <label for="od">Data de entrada</label>
         <input id="od" type="date" bind:value={form.date} />
       </div>
     </div>
+
+    {#if novoCliente}
+      <!-- Cadastro dentro do pedido. Não é um <form> dentro de outro — o HTML
+           não permite —, por isso o Enter de cada campo é tratado à mão. -->
+      <div class="novo-cliente">
+        <div class="novo-cliente-titulo">
+          <b>Cadastrar cliente</b>
+          <button
+            type="button"
+            class="close"
+            aria-label="Fechar o cadastro de cliente"
+            onclick={() => (novoCliente = null)}
+          >
+            ×
+          </button>
+        </div>
+
+        <div class="grid2">
+          <div class="form-group">
+            <label for="ncn">Nome *</label>
+            <input
+              id="ncn"
+              bind:this={campoNomeCliente}
+              bind:value={novoCliente.name}
+              onkeydown={teclaNoCadastro}
+            />
+          </div>
+          <div class="form-group">
+            <label for="ncp">Telefone</label>
+            <input
+              id="ncp"
+              bind:value={novoCliente.phone}
+              onkeydown={teclaNoCadastro}
+              placeholder="(35) 99999-9999"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="nca">Endereço</label>
+          <input id="nca" bind:value={novoCliente.address} onkeydown={teclaNoCadastro} />
+        </div>
+
+        <p class="field-dica">
+          O telefone é o que permite avisar pelo WhatsApp quando a peça ficar
+          pronta. Observações e o resto da ficha você completa depois, na tela
+          de Clientes.
+        </p>
+
+        {#if erroCliente}
+          <p class="field-error">{erroCliente}</p>
+        {/if}
+
+        <div class="novo-cliente-foot">
+          <button
+            type="button"
+            class="btn light small"
+            onclick={() => (novoCliente = null)}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="btn small"
+            disabled={salvandoCliente}
+            onclick={salvarNovoCliente}
+          >
+            {salvandoCliente ? 'Salvando…' : 'Salvar cliente'}
+          </button>
+        </div>
+      </div>
+    {/if}
 
     <div class="grid2">
       <div class="form-group">

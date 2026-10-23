@@ -46,12 +46,9 @@
     current = id
   }
 
+  // Nada de desviar para Clientes quando a lista está vazia: o modal do pedido
+  // cadastra a cliente sem sair de lá.
   function openNewOrder() {
-    if (data.clients.length === 0) {
-      data.error = 'Cadastre primeiro um cliente para poder criar um pedido.'
-      current = 'clientes'
-      return
-    }
     newOrder = true
   }
 </script>

@@ -716,3 +716,28 @@ label {
   cursor: pointer;
 }
 .apelido:hover { background: #eef3f1; border-color: #76a9a9; }
+
+/* Cadastro da cliente dentro do modal do pedido. */
+.cliente-campo { display: flex; gap: 7px; align-items: center; }
+.cliente-campo select { flex: 1; min-width: 0; }
+.cliente-campo .btn { white-space: nowrap; }
+
+.novo-cliente {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 13px 14px 14px;
+  background: #fbfcfc;
+  margin-bottom: 16px;
+}
+.novo-cliente-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+/* O cadastro é um trecho do formulário do pedido, não um formulário à parte:
+   os campos ficam mais juntos para não competir com o pedido em volta. */
+.novo-cliente .form-group { margin-bottom: 10px; }
+.novo-cliente-foot { display: flex; justify-content: flex-end; gap: 8px; }

@@ -54,14 +54,10 @@
       <option value={s}>{s}</option>
     {/each}
   </select>
-  <button class="btn" onclick={() => (creating = true)} disabled={data.clients.length === 0}>
-    + Novo pedido
-  </button>
+  <!-- Sem cliente nenhum o pedido continua podendo começar: o próprio modal
+       cadastra a cliente. -->
+  <button class="btn" onclick={() => (creating = true)}>+ Novo pedido</button>
 </div>
-
-{#if data.clients.length === 0}
-  <div class="notice">Cadastre um cliente antes de criar pedidos.</div>
-{/if}
 
 <div class="card">
   <div class="table-wrap">
