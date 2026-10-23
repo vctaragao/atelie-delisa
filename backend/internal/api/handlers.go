@@ -285,6 +285,7 @@ func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 	for i := range o.Items {
 		it := &o.Items[i]
 		it.Name = strings.TrimSpace(it.Name)
+		it.Piece = strings.TrimSpace(it.Piece)
 		if it.Name == "" {
 			it.Name = "Serviço personalizado"
 		}

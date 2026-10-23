@@ -14,7 +14,7 @@
      trocar pelo navegador. Acento cai nessa tabela e sai como ideograma,
      então o comprovante é emitido sem acento. */
 
-import { money, fmtDate, fmtDateTime } from './format.js'
+import { money, fmtDate, fmtDateTime, groupItemsByPiece } from './format.js'
 
 /** Largura útil da bobina, em caracteres. */
 export const COLUNAS = 32
@@ -133,12 +133,26 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   linhas.push(...par('Situação', pedido.status))
   linhas.push(SEPARADOR)
 
-  for (const item of pedido.items || []) {
-    linhas.push(...quebrar(item.name))
-    // A conta do item recuada, para o nome da peça se destacar.
-    linhas.push(
-      ...par(`  ${item.qty} x ${valor(item.priceCents)}`, valor(item.qty * item.priceCents)),
-    )
+  /* Os serviços saem agrupados pela peça de roupa, como foram montados na
+     ficha. O nome da peça encabeça o grupo em maiúsculas — é o único destaque
+     possível, já que o driver não imprime negrito — e repetir "(calca jeans)"
+     em cada serviço só gastaria linha. */
+  const grupos = groupItemsByPiece(pedido.items)
+  const temPeca = grupos.some((g) => g.peca)
+
+  for (const grupo of grupos) {
+    if (grupo.peca) linhas.push(...quebrar(grupo.peca.toUpperCase()))
+    // Cabeçalho para os serviços sem peça informada só quando há outros com
+    // peça: senão a cliente leria um título solto num cupom de um item só.
+    else if (temPeca) linhas.push(...quebrar('OUTROS SERVICOS'))
+
+    for (const item of grupo.itens) {
+      linhas.push(...quebrar(item.name))
+      // A conta do item recuada, para o nome do serviço se destacar.
+      linhas.push(
+        ...par(`  ${item.qty} x ${valor(item.priceCents)}`, valor(item.qty * item.priceCents)),
+      )
+    }
   }
 
   linhas.push(SEPARADOR)
@@ -164,7 +178,14 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   }
 
   linhas.push(SEPARADOR)
-  linhas.push(...centro(`Emitido em ${emitidoEm.toLocaleDateString('pt-BR')}`))
+  // Data e hora da emissão: duas vias do mesmo pedido, impressas em momentos
+  // diferentes, passam a dar para distinguir.
+  const dataEmissao = emitidoEm.toLocaleDateString('pt-BR')
+  const horaEmissao = emitidoEm.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  linhas.push(...centro(`Emitido em ${dataEmissao} as ${horaEmissao}`))
   linhas.push(...centro('Este comprovante registra o pedido acordado entre o ateliê e o cliente.'))
   linhas.push(...centro('NÃO É NOTA FISCAL.'))
 

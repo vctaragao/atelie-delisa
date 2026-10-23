@@ -32,14 +32,78 @@
     notes: order?.notes || '',
     discountPercent: order?.discountPercent ?? 0,
     rushPercent: order?.rushPercent ?? 0,
-    items: order?.items?.length
-      ? order.items.map((i) => ({
-          serviceId: i.serviceId,
-          name: i.name,
-          qty: i.qty,
-          price: fromCents(i.priceCents),
-        }))
-      : [{ serviceId: null, name: '', qty: 1, price: 0 }],
+    // O formulário trabalha por peça de roupa: cada peça com os serviços que
+    // vão nela. No banco continua um serviço por linha, cada um guardando o
+    // nome da sua peça — a montagem e o desmonte ficam nas duas funções
+    // abaixo.
+    pecas: agruparPorPeca(order?.items),
+  })
+
+  function servicoVazio() {
+    return { serviceId: null, name: '', qty: 1, price: 0 }
+  }
+
+  /** Monta os blocos do formulário a partir dos itens gravados no pedido. */
+  function agruparPorPeca(items) {
+    if (!items?.length) return [{ nome: '', servicos: [servicoVazio()] }]
+
+    const grupos = []
+    for (const i of items) {
+      const nome = i.piece || ''
+      // Serviços da mesma peça caem no mesmo bloco, na ordem em que a peça
+      // apareceu pela primeira vez.
+      let grupo = grupos.find((g) => g.nome === nome)
+      if (!grupo) {
+        grupo = { nome, servicos: [] }
+        grupos.push(grupo)
+      }
+      grupo.servicos.push({
+        serviceId: i.serviceId,
+        name: i.name,
+        qty: i.qty,
+        price: fromCents(i.priceCents),
+      })
+    }
+    return grupos
+  }
+
+  /** Desmonta os blocos de volta em uma lista de serviços, cada um com a sua
+      peça. A ordem das peças e dos serviços dentro delas é preservada. */
+  function servicosDoFormulario() {
+    const lista = []
+    for (const peca of form.pecas) {
+      for (const s of peca.servicos) {
+        lista.push({
+          serviceId: s.serviceId,
+          name: (s.name || '').trim() || 'Serviço personalizado',
+          piece: (peca.nome || '').trim(),
+          qty: Number(s.qty) || 1,
+          priceCents: toCents(s.price),
+        })
+      }
+    }
+    return lista
+  }
+
+  /* Sugestões para o campo da peça. A lista é só um atalho de digitação: o
+     campo continua aceitando qualquer coisa, porque a cliente chega com
+     "jaqueta de couro" e nenhuma lista fechada daria conta. */
+  const PECAS_COMUNS = [
+    'Calça jeans', 'Calça social', 'Vestido', 'Saia', 'Camisa', 'Blusa',
+    'Blazer', 'Terno', 'Jaqueta', 'Casaco', 'Uniforme', 'Cortina',
+  ]
+
+  // As peças que ela já usou em outros pedidos vêm junto: com o tempo, a
+  // lista passa a falar o vocabulário do ateliê.
+  const sugestoesDePeca = $derived.by(() => {
+    const usadas = new Set()
+    for (const o of data.orders) {
+      for (const i of o.items || []) {
+        if (i.piece) usadas.add(i.piece)
+      }
+    }
+    for (const p of PECAS_COMUNS) usadas.add(p)
+    return [...usadas].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   })
 
   let saving = $state(false)
@@ -49,7 +113,9 @@
   // sobre o subtotal dos serviços.
   const conta = $derived(
     orderAmounts(
-      form.items.map((i) => ({ qty: i.qty, priceCents: toCents(i.price) })),
+      form.pecas.flatMap((p) =>
+        p.servicos.map((s) => ({ qty: s.qty, priceCents: toCents(s.price) })),
+      ),
       form.discountPercent,
       form.rushPercent,
     ),
@@ -60,12 +126,30 @@
   const prazo = $derived(prazoEmHoras(form.date, form.due, form.dueTime))
   const urgente = $derived(prazo !== null && prazo < URGENCIA_HORAS)
 
-  function addItem() {
-    form.items.push({ serviceId: null, name: '', qty: 1, price: 0 })
+  function addPeca() {
+    form.pecas.push({ nome: '', servicos: [servicoVazio()] })
   }
 
-  function removeItem(index) {
-    form.items.splice(index, 1)
+  function removePeca(index) {
+    form.pecas.splice(index, 1)
+    // O pedido precisa de pelo menos um serviço para existir; o formulário
+    // nunca fica sem nenhuma linha para preencher.
+    if (form.pecas.length === 0) addPeca()
+  }
+
+  function addServico(peca) {
+    peca.servicos.push(servicoVazio())
+  }
+
+  function removeServico(peca, index) {
+    peca.servicos.splice(index, 1)
+    if (peca.servicos.length > 0) return
+
+    // Peça sem serviço nenhum não tem o que fazer no pedido. Se era a única,
+    // volta uma linha em branco em vez de deixar o formulário vazio.
+    const i = form.pecas.indexOf(peca)
+    if (form.pecas.length > 1) form.pecas.splice(i, 1)
+    else peca.servicos.push(servicoVazio())
   }
 
   // Ao escolher um serviço da tabela, copia nome e preço para o item. O preço
@@ -84,14 +168,7 @@
     event.preventDefault()
     formError = null
 
-    const items = form.items
-      .map((i) => ({
-        serviceId: i.serviceId,
-        name: (i.name || '').trim() || 'Serviço personalizado',
-        qty: Number(i.qty) || 1,
-        priceCents: toCents(i.price),
-      }))
-      .filter((i) => i.qty > 0)
+    const items = servicosDoFormulario().filter((i) => i.qty > 0)
 
     if (items.length === 0) {
       formError = 'Adicione pelo menos um serviço.'
@@ -175,49 +252,102 @@
     </div>
 
     <div class="form-group">
-      <label for="oitems">Peças e serviços</label>
+      <label for="oitems">
+        Peças e serviços
+        <span style="font-weight:400;color:var(--muted)">
+          uma peça por bloco, com os serviços dela dentro
+        </span>
+      </label>
+
       <div class="service-list" id="oitems">
-        {#each form.items as item, i}
-          <div class="service-row">
-            <!-- Os value são strings de propósito: o <select> do DOM compara
-                 valores como texto. -->
-            <select
-              value={item.serviceId === null ? '' : String(item.serviceId)}
-              onchange={(e) => pickService(item, e.currentTarget.value)}
-            >
-              <option value="">Serviço personalizado</option>
-              {#each data.services as s (s.id)}
-                <option value={String(s.id)}>{s.name} — {money(s.priceCents)}</option>
-              {/each}
-            </select>
-            <input type="number" min="1" step="1" bind:value={item.qty} aria-label="Quantidade" />
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              bind:value={item.price}
-              aria-label="Preço unitário"
-            />
-            <button
-              type="button"
-              class="close"
-              aria-label="Remover item"
-              onclick={() => removeItem(i)}
-            >
-              ×
+        {#each form.pecas as peca, pi}
+          <div class="peca-bloco">
+            <div class="peca-cabecalho">
+              <input
+                list="pecas-do-atelie"
+                placeholder="Peça — ex.: calça jeans"
+                bind:value={peca.nome}
+                aria-label="Peça de roupa"
+              />
+              <span class="peca-contagem">
+                {peca.servicos.length}
+                {peca.servicos.length === 1 ? 'serviço' : 'serviços'}
+              </span>
+              {#if form.pecas.length > 1}
+                <button
+                  type="button"
+                  class="close"
+                  aria-label="Remover esta peça e os serviços dela"
+                  onclick={() => removePeca(pi)}
+                >
+                  ×
+                </button>
+              {/if}
+            </div>
+
+            {#each peca.servicos as servico, si}
+              <div class="service-item">
+                <div class="service-row">
+                  <!-- Os value são strings de propósito: o <select> do DOM
+                       compara valores como texto. -->
+                  <select
+                    value={servico.serviceId === null ? '' : String(servico.serviceId)}
+                    onchange={(e) => pickService(servico, e.currentTarget.value)}
+                  >
+                    <option value="">Serviço personalizado</option>
+                    {#each data.services as s (s.id)}
+                      <option value={String(s.id)}>{s.name} — {money(s.priceCents)}</option>
+                    {/each}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    bind:value={servico.qty}
+                    aria-label="Quantidade"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    bind:value={servico.price}
+                    aria-label="Preço unitário"
+                  />
+                  <button
+                    type="button"
+                    class="close"
+                    aria-label="Remover este serviço"
+                    onclick={() => removeServico(peca, si)}
+                  >
+                    ×
+                  </button>
+                </div>
+                {#if servico.serviceId === null}
+                  <input
+                    placeholder="Descreva o serviço"
+                    bind:value={servico.name}
+                    aria-label="Descrição do serviço personalizado"
+                  />
+                {/if}
+              </div>
+            {/each}
+
+            <button type="button" class="btn light small" onclick={() => addServico(peca)}>
+              + Adicionar serviço nesta peça
             </button>
           </div>
-          {#if item.serviceId === null}
-            <input
-              placeholder="Descreva a peça/serviço"
-              bind:value={item.name}
-              aria-label="Descrição do serviço personalizado"
-            />
-          {/if}
         {/each}
       </div>
-      <button type="button" class="btn light small" style="margin-top:8px" onclick={addItem}>
-        + Adicionar serviço
+
+      <!-- Uma lista só para todos os campos de peça: o datalist é referenciado
+           pelo id e não precisa ser repetido a cada bloco. -->
+      <datalist id="pecas-do-atelie">
+        {#each sugestoesDePeca as p (p)}
+          <option value={p}></option>
+        {/each}
+      </datalist>
+      <button type="button" class="btn light small" style="margin-top:8px" onclick={addPeca}>
+        + Adicionar outra peça
       </button>
     </div>
 

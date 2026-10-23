@@ -20,10 +20,13 @@ type Service struct {
 	Time       string `json:"time"`
 }
 
+// OrderItem é um serviço dentro do pedido. Piece é a peça de roupa em que ele
+// será feito — "calça jeans", "vestido de festa" —, texto livre e opcional.
 type OrderItem struct {
 	ID         int64  `json:"id"`
 	ServiceID  *int64 `json:"serviceId"`
 	Name       string `json:"name"`
+	Piece      string `json:"piece"`
 	Qty        int64  `json:"qty"`
 	PriceCents int64  `json:"priceCents"`
 }

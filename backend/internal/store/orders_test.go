@@ -273,3 +273,79 @@ func TestBackupPreservaDescontoEUrgencia(t *testing.T) {
 		t.Errorf("total restaurado %d, esperava 11000", restaurado.TotalCents)
 	}
 }
+
+// TestPecaDoItemSobreviveAoCicloCompleto: a peça diz em qual roupa o serviço
+// será feito. Como é texto do item, e não do pedido, some fácil num INSERT
+// esquecido — e aí a ficha volta dizendo "bainha" sem dizer de quê.
+func TestPecaDoItemSobreviveAoCicloCompleto(t *testing.T) {
+	s := bancoDeTeste(t)
+
+	cliente, err := s.CreateClient(Client{Name: "Dona Delisa"})
+	if err != nil {
+		t.Fatalf("criando cliente: %v", err)
+	}
+
+	pedido, err := s.CreateOrder(Order{
+		ClientID: cliente.ID,
+		Date:     "2026-10-22",
+		Status:   "Em produção",
+		Items: []OrderItem{
+			{Name: "Bainha", Piece: "Calça jeans", Qty: 1, PriceCents: 2500},
+			{Name: "Ajuste de cintura", Piece: "Calça jeans", Qty: 1, PriceCents: 3500},
+			{Name: "Troca de zíper", Piece: "", Qty: 1, PriceCents: 3500},
+		},
+	})
+	if err != nil {
+		t.Fatalf("criando pedido: %v", err)
+	}
+
+	confere := func(momento string, o Order) {
+		t.Helper()
+		if len(o.Items) != 3 {
+			t.Fatalf("%s: esperava 3 serviços, veio %d", momento, len(o.Items))
+		}
+		if o.Items[0].Piece != "Calça jeans" || o.Items[1].Piece != "Calça jeans" {
+			t.Errorf("%s: peças vieram %q e %q", momento, o.Items[0].Piece, o.Items[1].Piece)
+		}
+		// Serviço sem peça informada continua válido, com o texto vazio.
+		if o.Items[2].Piece != "" {
+			t.Errorf("%s: o terceiro serviço deveria estar sem peça, veio %q", momento, o.Items[2].Piece)
+		}
+		// A ordem dos itens é a que ela montou na tela.
+		if o.Items[0].Name != "Bainha" || o.Items[1].Name != "Ajuste de cintura" {
+			t.Errorf("%s: a ordem dos serviços mudou: %+v", momento, o.Items)
+		}
+	}
+
+	confere("ao criar", pedido)
+
+	lido, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo: %v", err)
+	}
+	confere("ao reler", lido)
+
+	lido.Items[2].Piece = "Vestido de festa"
+	atualizado, err := s.UpdateOrder(lido.ID, lido)
+	if err != nil {
+		t.Fatalf("atualizando: %v", err)
+	}
+	if atualizado.Items[2].Piece != "Vestido de festa" {
+		t.Errorf("depois de editar, a peça veio %q", atualizado.Items[2].Piece)
+	}
+
+	backup, err := s.Export()
+	if err != nil {
+		t.Fatalf("exportando: %v", err)
+	}
+	if err := s.Import(backup); err != nil {
+		t.Fatalf("restaurando: %v", err)
+	}
+	restaurado, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo o restaurado: %v", err)
+	}
+	if restaurado.Items[0].Piece != "Calça jeans" || restaurado.Items[2].Piece != "Vestido de festa" {
+		t.Errorf("o backup perdeu as peças: %+v", restaurado.Items)
+	}
+}

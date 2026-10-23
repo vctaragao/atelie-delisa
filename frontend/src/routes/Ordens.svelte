@@ -4,7 +4,14 @@
   import AvisarWhatsapp from '../lib/AvisarWhatsapp.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
-  import { money, fmtDateTime, statusClass, ORDER_STATUSES } from '../lib/format.js'
+  import {
+    money,
+    fmtDateTime,
+    statusClass,
+    groupItemsByPiece,
+    listItems,
+    ORDER_STATUSES,
+  } from '../lib/format.js'
 
   let query = $state('')
   let statusFilter = $state('')
@@ -71,8 +78,9 @@
             <td><b>#{o.number}</b></td>
             <td>{o.clientName}</td>
             <td style="white-space:normal;min-width:180px">
-              {#each o.items as item (item.id)}
-                {item.qty}× {item.name}<br />
+              {#each groupItemsByPiece(o.items) as g (g.peca)}
+                {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+                {listItems(g.itens)}<br />
               {/each}
             </td>
             <td>{fmtDateTime(o.due, o.dueTime)}</td>

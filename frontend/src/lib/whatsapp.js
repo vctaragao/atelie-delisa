@@ -13,7 +13,7 @@
    contrariam os termos de uso e colocam o número do ateliê em risco de
    bloqueio — por isso não estão aqui. */
 
-import { money, fmtDate, orderQty } from './format.js'
+import { money, fmtDate, orderQty, groupItemsByPiece, listItems } from './format.js'
 
 /**
  * O telefone da ficha no formato que o link do WhatsApp espera: só dígitos,
@@ -51,9 +51,12 @@ function primeiroNome(nome) {
   return partes[0] || 'tudo bem'
 }
 
-/** As peças do pedido em uma linha: "2× Bainha de calça, 1× Troca de zíper". */
+/** Os serviços do pedido, agrupados pela peça de roupa:
+    "calça jeans (1× Bainha, 1× Ajuste de cintura), 1× Troca de zíper". */
 function listaDePecas(order) {
-  return (order.items || []).map((i) => `${i.qty}× ${i.name}`).join(', ')
+  return groupItemsByPiece(order.items)
+    .map((g) => (g.peca ? `${g.peca} (${listItems(g.itens)})` : listItems(g.itens)))
+    .join(', ')
 }
 
 function entregaCombinada(order) {

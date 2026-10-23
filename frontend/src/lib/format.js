@@ -142,6 +142,33 @@ export const PAYMENT_METHODS = [
   'Não informado', 'Pix', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito',
 ]
 
+/**
+ * Junta os serviços do pedido pela peça de roupa, mantendo a ordem em que
+ * cada peça aparece: [{ peca, itens }]. Os serviços sem peça informada ficam
+ * num grupo de peca vazia.
+ *
+ * É o que deixa a ficha, as listagens e o comprovante contarem a mesma
+ * história: "na calça jeans, bainha e ajuste de cintura".
+ */
+export function groupItemsByPiece(items) {
+  const grupos = []
+  for (const item of items || []) {
+    const peca = item.piece || ''
+    let grupo = grupos.find((g) => g.peca === peca)
+    if (!grupo) {
+      grupo = { peca, itens: [] }
+      grupos.push(grupo)
+    }
+    grupo.itens.push(item)
+  }
+  return grupos
+}
+
+/** Os serviços de um grupo em uma linha: "1× Bainha, 1× Ajuste de cintura". */
+export function listItems(itens) {
+  return (itens || []).map((i) => `${i.qty}× ${i.name}`).join(', ')
+}
+
 /** Quantas peças o pedido tem, somando as quantidades de cada serviço. */
 export function orderQty(order) {
   return (order?.items || []).reduce((sum, i) => sum + (Number(i.qty) || 0), 0)
