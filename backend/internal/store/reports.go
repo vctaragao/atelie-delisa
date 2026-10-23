@@ -61,9 +61,11 @@ func (s *Store) Summary() (Summary, error) {
 	}
 	sum.RecentOrders = recent
 
+	// Dentro do mesmo dia vale a hora combinada; o pedido sem hora marcada
+	// cai no fim do dia, e não antes de quem tem horário.
 	upcoming, err := s.queryOrders(
 		`WHERE o.due <> '' AND o.status NOT IN ('Entregue', 'Cancelado')
-		 ORDER BY o.due ASC LIMIT 5`)
+		 ORDER BY o.due ASC, (o.due_time = '') ASC, o.due_time ASC LIMIT 5`)
 	if err != nil {
 		return Summary{}, err
 	}
@@ -139,10 +141,11 @@ func (s *Store) Import(b Backup) error {
 	}
 	for _, o := range b.Orders {
 		_, err := tx.Exec(
-			`INSERT INTO orders (id, number, client_id, date, due, status, payment, paid, notes)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			o.ID, o.Number, o.ClientID, o.Date, o.Due, o.Status, o.Payment,
-			boolToInt(o.Paid), o.Notes,
+			`INSERT INTO orders (id, number, client_id, date, due, due_time, status,
+			                     payment, paid, notes, discount_percent, rush_percent)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			o.ID, o.Number, o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
+			boolToInt(o.Paid), o.Notes, o.DiscountPercent, o.RushPercent,
 		)
 		if err != nil {
 			return err

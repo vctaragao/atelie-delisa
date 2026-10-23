@@ -1,6 +1,6 @@
 <script>
   import { data } from '../lib/data.svelte.js'
-  import { money, fmtDate, statusClass } from '../lib/format.js'
+  import { money, fmtDate, fmtDateTime, statusClass } from '../lib/format.js'
 
   let { goto } = $props()
 
@@ -60,7 +60,7 @@
       <div style="padding:12px 0;border-bottom:1px solid var(--border)">
         <b>{o.clientName}</b><br />
         <span style="font-size:12px;color:var(--muted)">
-          #{o.number} · entrega {fmtDate(o.due)}
+          #{o.number} · entrega {fmtDateTime(o.due, o.dueTime)}
         </span>
       </div>
     {:else}

@@ -14,7 +14,7 @@
      trocar pelo navegador. Acento cai nessa tabela e sai como ideograma,
      então o comprovante é emitido sem acento. */
 
-import { money, fmtDate } from './format.js'
+import { money, fmtDate, fmtDateTime } from './format.js'
 
 /** Largura útil da bobina, em caracteres. */
 export const COLUNAS = 32
@@ -129,7 +129,7 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   if (cliente?.phone) linhas.push(...par('Telefone', cliente.phone))
   if (cliente?.address) linhas.push(...par('Endereço', cliente.address))
   linhas.push(...par('Entrada', fmtDate(pedido.date)))
-  linhas.push(...par('Entrega', fmtDate(pedido.due)))
+  linhas.push(...par('Entrega', fmtDateTime(pedido.due, pedido.dueTime)))
   linhas.push(...par('Situação', pedido.status))
   linhas.push(SEPARADOR)
 
@@ -142,6 +142,17 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   }
 
   linhas.push(SEPARADOR)
+  // O subtotal só aparece quando há desconto ou urgência: sem eles, repetir o
+  // mesmo valor duas vezes seguidas só gastaria bobina e confundiria a leitura.
+  if (pedido.discountCents || pedido.rushCents) {
+    linhas.push(...par('Serviços', valor(pedido.itemsCents)))
+    if (pedido.discountCents) {
+      linhas.push(...par(`Desconto ${pedido.discountPercent}%`, `-${valor(pedido.discountCents)}`))
+    }
+    if (pedido.rushCents) {
+      linhas.push(...par(`Urgência ${pedido.rushPercent}%`, `+${valor(pedido.rushCents)}`))
+    }
+  }
   linhas.push(...par('TOTAL', money(pedido.totalCents)))
   linhas.push(...par('Pagamento', pedido.payment))
   linhas.push(...par('Situação', pedido.paid ? 'PAGO' : 'PENDENTE'))

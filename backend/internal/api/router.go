@@ -14,16 +14,19 @@ func (s *Server) Routes(allowedOrigins []string) http.Handler {
 
 	mux.HandleFunc("GET /api/health", s.health)
 	mux.HandleFunc("GET /api/summary", s.summary)
+	mux.HandleFunc("GET /api/report", s.report)
 
 	mux.HandleFunc("GET /api/clients", s.listClients)
 	mux.HandleFunc("POST /api/clients", s.createClient)
 	mux.HandleFunc("PUT /api/clients/{id}", s.updateClient)
 	mux.HandleFunc("DELETE /api/clients/{id}", s.deleteClient)
+	mux.HandleFunc("POST /api/clients/import", s.importClients)
 
 	mux.HandleFunc("GET /api/services", s.listServices)
 	mux.HandleFunc("POST /api/services", s.createService)
 	mux.HandleFunc("PUT /api/services/{id}", s.updateService)
 	mux.HandleFunc("DELETE /api/services/{id}", s.deleteService)
+	mux.HandleFunc("POST /api/services/import", s.importServices)
 
 	mux.HandleFunc("GET /api/orders", s.listOrders)
 	mux.HandleFunc("POST /api/orders", s.createOrder)

@@ -9,14 +9,10 @@ class ApiError extends Error {
   }
 }
 
-async function request(method, path, body) {
+async function send(method, path, init) {
   let res
   try {
-    res = await fetch(`/api${path}`, {
-      method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
+    res = await fetch(`/api${path}`, { method, ...init })
   } catch {
     throw new ApiError('Não foi possível falar com o servidor. Ele está rodando?', 0)
   }
@@ -39,6 +35,22 @@ async function request(method, path, body) {
   return payload
 }
 
+function request(method, path, body) {
+  return send(
+    method,
+    path,
+    body === undefined
+      ? {}
+      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+  )
+}
+
+// Envia o arquivo como ele é, sem passar por JSON nem por texto: é isso que
+// preserva os acentos de uma planilha salva pelo Excel, que não grava em UTF-8
+// — o backend é que descobre a codificação.
+const postFile = (path, file) =>
+  send('POST', path, { headers: { 'Content-Type': 'text/csv' }, body: file })
+
 const get = (path) => request('GET', path)
 const post = (path, body) => request('POST', path, body ?? {})
 const put = (path, body) => request('PUT', path, body)
@@ -46,16 +58,21 @@ const del = (path) => request('DELETE', path)
 
 export const api = {
   summary: () => get('/summary'),
+  report: (from, to) => get(`/report?from=${from}&to=${to}`),
 
   listClients: () => get('/clients'),
   createClient: (c) => post('/clients', c),
   updateClient: (id, c) => put(`/clients/${id}`, c),
   deleteClient: (id) => del(`/clients/${id}`),
+  importClients: (file, update) =>
+    postFile(`/clients/import${update ? '?update=1' : ''}`, file),
 
   listServices: () => get('/services'),
   createService: (s) => post('/services', s),
   updateService: (id, s) => put(`/services/${id}`, s),
   deleteService: (id) => del(`/services/${id}`),
+  importServices: (file, update) =>
+    postFile(`/services/import${update ? '?update=1' : ''}`, file),
 
   listOrders: () => get('/orders'),
   createOrder: (o) => post('/orders', o),

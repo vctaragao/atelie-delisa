@@ -435,3 +435,218 @@ label {
      esquerda do papel, e qualquer recuo aqui empurraria o texto para fora. */
   .comprovante { border: 0; margin: 0; padding: 0; }
 }
+
+/* Agenda — calendário do mês e o detalhe do dia escolhido. */
+.agenda-dia { margin-bottom: 16px; }
+.agenda-dia.hoje { border-left: 4px solid var(--gold); }
+.agenda-dia.atrasado { border-left: 4px solid var(--danger); }
+.agenda-dia.atrasado .section-title h2 { color: var(--danger); }
+.agenda-resumo { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.agenda-hora { color: var(--teal); font-variant-numeric: tabular-nums; }
+.agenda-aviso {
+  margin: -6px 0 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cal-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.cal-nav { display: flex; align-items: center; gap: 8px; }
+.cal-nav h2 { font-size: 17px; margin: 0; color: var(--teal); min-width: 160px; }
+.cal-topo-direita { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.calendario {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.cal-cabecalho {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+/* Cada dia é um botão: além do clique com o mouse, dá para chegar nele pelo
+   teclado, e o leitor de tela anuncia que é clicável. */
+.cal-dia {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 104px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.cal-dia:hover { border-color: #76a9a9; }
+.cal-dia.fora { background: #fafbfa; }
+.cal-dia.fora .cal-numero { color: #b4bcba; }
+.cal-dia.vazio { cursor: default; }
+.cal-dia.hoje { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.cal-dia.selecionado {
+  border-color: var(--teal);
+  box-shadow: inset 0 0 0 2px var(--teal);
+}
+
+.cal-numero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cal-contagem {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* A tarja de cada pedido no quadradinho. Usa as mesmas cores dos selos de
+   status da lista de ordens, para a cor querer dizer a mesma coisa nas duas
+   telas. */
+.cal-pedido {
+  font-size: 11px;
+  line-height: 1.35;
+  padding: 2px 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-pedido b { font-variant-numeric: tabular-nums; }
+.cal-pedido.pendente { background: #fff2d8; color: #9a6a16; }
+.cal-pedido.producao { background: #e7f1f4; color: #286174; }
+.cal-pedido.pronto { background: #e2f2e8; color: #337051; }
+.cal-pedido.entregue { background: #e8eee9; color: #41624e; }
+.cal-pedido.cancelado { background: #f7e7e7; color: #a94b4b; }
+.cal-mais { font-size: 10px; color: var(--muted); padding-left: 5px; }
+
+/* Numa tela estreita o mês continua inteiro, mas os quadradinhos ficam só com
+   o dia e a contagem de peças: o nome da cliente não caberia sem cortar no
+   meio, e o detalhe do dia escolhido fica logo abaixo. */
+@media (max-width: 760px) {
+  .calendario { gap: 4px; }
+  .cal-dia { min-height: 54px; padding: 5px; }
+  .cal-pedido, .cal-mais { display: none; }
+  .cal-numero { flex-direction: column; align-items: flex-start; gap: 1px; }
+  .cal-nav h2 { min-width: 0; font-size: 15px; }
+}
+
+/* Conta do pedido: subtotal, desconto, urgência e total, um por linha. A
+   .summary de uma linha só continua valendo para quem a usa sem .conta. */
+.summary.conta { display: block; }
+.conta-linha { display: flex; justify-content: space-between; gap: 10px; }
+.conta-linha + .conta-linha { margin-top: 6px; }
+.conta-linha.desconto { color: var(--green); }
+.conta-linha.acrescimo { color: var(--aviso-escuro); }
+.conta-linha.total {
+  border-top: 1px solid var(--border);
+  margin-top: 9px;
+  padding-top: 9px;
+  font-size: 15px;
+  color: var(--teal);
+}
+
+/* O aviso de urgência fica dentro do formulário, logo abaixo dos percentuais. */
+.notice.urgencia {
+  background: #fff6e4;
+  border-left-color: var(--aviso);
+  color: var(--aviso-escuro);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Marca do desconto e da urgência na lista de ordens, embaixo do valor. */
+.ajuste-total { display: block; font-size: 11px; color: var(--muted); }
+.ajuste-total .desconto { color: var(--green); }
+.ajuste-total .acrescimo { color: var(--aviso-escuro); }
+
+/* Entrega: o dia e a hora dividem uma linha, como um campo só. */
+.entrega-campos { display: grid; grid-template-columns: 1fr 108px; gap: 7px; }
+.field-dica { color: var(--muted); font-size: 12px; margin: 6px 0 0; }
+
+@media (max-width: 600px) {
+  .entrega-campos { grid-template-columns: 1fr 96px; }
+}
+
+/* Relatórios. */
+.rel-filtro {
+  display: grid;
+  grid-template-columns: 1fr 160px 160px auto;
+  gap: 10px;
+  align-items: end;
+}
+.rel-periodo { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.metric-rodape { font-size: 11px; color: var(--muted); margin-top: 6px; }
+.rel-nota { font-size: 11px; color: var(--muted); margin: 12px 0 0; }
+
+/* A posição no ranking, como as bolinhas numeradas da referência. */
+.rel-posicao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  background: var(--teal);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rel-status {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+.rel-status-caixa {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.rel-status-numero {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--teal);
+  margin-bottom: 8px;
+}
+
+.rel-resumo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.rel-resumo > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #f4f6f5;
+  border-radius: 9px;
+  padding: 13px;
+}
+.rel-resumo span { font-size: 12px; color: var(--muted); }
+.rel-resumo b { font-size: 17px; color: var(--teal); }
+
+@media (max-width: 760px) {
+  .rel-filtro { grid-template-columns: 1fr 1fr; }
+  .rel-filtro button { grid-column: 1 / -1; }
+}

@@ -37,8 +37,11 @@ func TestMigracaoAlcancaBancoQueJaExiste(t *testing.T) {
 	if err := os.MkdirAll(migDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// A versão é bem alta de propósito: o goose não reaplica um número que o
+	// banco já registrou, e as migrações de verdade vão continuar subindo.
+	// Com 0002 este teste passava a mentir no dia em que a 0002 existisse.
 	nova := "-- +goose Up\nALTER TABLE clients ADD COLUMN apelido TEXT NOT NULL DEFAULT '';\n"
-	if err := os.WriteFile(filepath.Join(migDir, "0002_adiciona_apelido.sql"), []byte(nova), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(migDir, "9999_adiciona_apelido.sql"), []byte(nova), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,12 +95,19 @@ func TestMigracoesSaoIdempotentes(t *testing.T) {
 	}
 	defer db.Close()
 
+	// O esperado sai da própria pasta de migrações, e não de um número fixo:
+	// assim o teste continua valendo quando uma migração nova for criada.
+	arquivos, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	var n int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM goose_db_version WHERE version_id > 0`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 {
-		t.Errorf("esperava 1 migracao registrada, veio %d", n)
+	if n != len(arquivos) {
+		t.Errorf("esperava %d migracoes registradas, veio %d", len(arquivos), n)
 	}
 
 	// seedServices tambem nao pode duplicar a tabela de precos.

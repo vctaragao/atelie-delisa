@@ -2,7 +2,18 @@
   import Modal from '../lib/Modal.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
-  import { money, toCents, fromCents, today, ORDER_STATUSES, PAYMENT_METHODS } from '../lib/format.js'
+  import {
+    money,
+    toCents,
+    fromCents,
+    today,
+    orderAmounts,
+    prazoEmHoras,
+    ORDER_STATUSES,
+    PAYMENT_METHODS,
+    URGENCIA_HORAS,
+    URGENCIA_PADRAO,
+  } from '../lib/format.js'
 
   let { order = null, onclose } = $props()
 
@@ -14,10 +25,13 @@
     clientId: order?.clientId ?? data.clients[0]?.id ?? 0,
     date: order?.date || today(),
     due: order?.due || '',
+    dueTime: order?.dueTime || '',
     status: order?.status || ORDER_STATUSES[0],
     payment: order?.payment || PAYMENT_METHODS[0],
     paid: order?.paid ?? false,
     notes: order?.notes || '',
+    discountPercent: order?.discountPercent ?? 0,
+    rushPercent: order?.rushPercent ?? 0,
     items: order?.items?.length
       ? order.items.map((i) => ({
           serviceId: i.serviceId,
@@ -31,9 +45,20 @@
   let saving = $state(false)
   let formError = $state(null)
 
-  const totalCents = $derived(
-    form.items.reduce((sum, i) => sum + (Number(i.qty) || 0) * toCents(i.price), 0),
+  // A conta mostrada aqui segue a mesma regra do banco: desconto e urgência
+  // sobre o subtotal dos serviços.
+  const conta = $derived(
+    orderAmounts(
+      form.items.map((i) => ({ qty: i.qty, priceCents: toCents(i.price) })),
+      form.discountPercent,
+      form.rushPercent,
+    ),
   )
+
+  // Prazo entre a entrada e a entrega combinada, para avisar quando o pedido
+  // é de urgência.
+  const prazo = $derived(prazoEmHoras(form.date, form.due, form.dueTime))
+  const urgente = $derived(prazo !== null && prazo < URGENCIA_HORAS)
 
   function addItem() {
     form.items.push({ serviceId: null, name: '', qty: 1, price: 0 })
@@ -77,10 +102,15 @@
       clientId: Number(form.clientId),
       date: form.date,
       due: form.due,
+      // Sem data marcada a hora não tem lugar na agenda; o backend também a
+      // descarta, e limpar aqui evita salvar e ver o campo voltar vazio.
+      dueTime: form.due ? form.dueTime : '',
       status: form.status,
       payment: form.payment,
       paid: form.paid,
       notes: form.notes,
+      discountPercent: Number(form.discountPercent) || 0,
+      rushPercent: Number(form.rushPercent) || 0,
       items,
     }
 
@@ -118,8 +148,21 @@
 
     <div class="grid2">
       <div class="form-group">
-        <label for="odu">Prazo de entrega</label>
-        <input id="odu" type="date" bind:value={form.due} />
+        <!-- O dia e a hora ficam no mesmo campo, lado a lado: a entrega é uma
+             data e um horário, não duas informações separadas. -->
+        <label for="odu">Entrega — dia e horário</label>
+        <div class="entrega-campos">
+          <input id="odu" type="date" bind:value={form.due} />
+          <input
+            id="oduh"
+            type="time"
+            bind:value={form.dueTime}
+            aria-label="Horário de entrega"
+          />
+        </div>
+        {#if form.dueTime && !form.due}
+          <p class="field-dica">Marque também o dia, senão o horário não é guardado.</p>
+        {/if}
       </div>
       <div class="form-group">
         <label for="ost">Status</label>
@@ -180,6 +223,54 @@
 
     <div class="grid2">
       <div class="form-group">
+        <label for="odesc">Desconto (%)</label>
+        <input
+          id="odesc"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          bind:value={form.discountPercent}
+        />
+      </div>
+      <div class="form-group">
+        <label for="ourg">Acréscimo de urgência (%)</label>
+        <input
+          id="ourg"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          bind:value={form.rushPercent}
+        />
+      </div>
+    </div>
+
+    {#if urgente}
+      <div class="notice urgencia">
+        Entrega em menos de {URGENCIA_HORAS} h
+        {#if prazo >= 0}
+          — faltam cerca de {Math.max(1, Math.round(prazo))} h.
+        {:else}
+          — o prazo combinado já passou.
+        {/if}
+        {#if Number(form.rushPercent) > 0}
+          Acréscimo de urgência de {Number(form.rushPercent)}% aplicado.
+        {:else}
+          <button
+            type="button"
+            class="btn light small"
+            style="margin-left:6px"
+            onclick={() => (form.rushPercent = URGENCIA_PADRAO)}
+          >
+            Aplicar {URGENCIA_PADRAO}% de urgência
+          </button>
+        {/if}
+      </div>
+    {/if}
+
+    <div class="grid2">
+      <div class="form-group">
         <label for="opay">Forma de pagamento</label>
         <select id="opay" bind:value={form.payment}>
           {#each PAYMENT_METHODS as p (p)}
@@ -206,9 +297,29 @@
       ></textarea>
     </div>
 
-    <div class="summary">
-      <span>Total do pedido</span>
-      <span>{money(totalCents)}</span>
+    <div class="summary conta">
+      {#if conta.discountCents || conta.rushCents}
+        <div class="conta-linha">
+          <span>Serviços</span>
+          <span>{money(conta.itemsCents)}</span>
+        </div>
+      {/if}
+      {#if conta.discountCents}
+        <div class="conta-linha desconto">
+          <span>Desconto de {Number(form.discountPercent)}%</span>
+          <span>− {money(conta.discountCents)}</span>
+        </div>
+      {/if}
+      {#if conta.rushCents}
+        <div class="conta-linha acrescimo">
+          <span>Urgência de {Number(form.rushPercent)}%</span>
+          <span>+ {money(conta.rushCents)}</span>
+        </div>
+      {/if}
+      <div class="conta-linha total">
+        <span>Total do pedido</span>
+        <span>{money(conta.totalCents)}</span>
+      </div>
     </div>
 
     {#if formError}
