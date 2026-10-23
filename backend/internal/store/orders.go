@@ -10,8 +10,10 @@ import (
 const orderCols = `
   o.id, o.number, o.client_id,
   COALESCE(c.name, 'Cliente removido'),
-  o.date, o.due, o.status, o.payment, o.paid, o.notes,
-  COALESCE(t.total_cents, 0)`
+  o.date, o.due, o.due_time, o.status, o.payment, o.paid, o.notes,
+  o.discount_percent, o.rush_percent,
+  COALESCE(t.items_cents, 0), COALESCE(t.discount_cents, 0),
+  COALESCE(t.rush_cents, 0), COALESCE(t.total_cents, 0)`
 
 const orderFrom = `
   FROM orders o
@@ -22,8 +24,9 @@ func scanOrder(row interface{ Scan(...any) error }) (Order, error) {
 	var o Order
 	err := row.Scan(
 		&o.ID, &o.Number, &o.ClientID, &o.ClientName,
-		&o.Date, &o.Due, &o.Status, &o.Payment, &o.Paid, &o.Notes,
-		&o.TotalCents,
+		&o.Date, &o.Due, &o.DueTime, &o.Status, &o.Payment, &o.Paid, &o.Notes,
+		&o.DiscountPercent, &o.RushPercent,
+		&o.ItemsCents, &o.DiscountCents, &o.RushCents, &o.TotalCents,
 	)
 	o.Items = []OrderItem{}
 	return o, err
@@ -128,9 +131,11 @@ func (s *Store) CreateOrder(o Order) (Order, error) {
 	}
 
 	res, err := tx.Exec(
-		`INSERT INTO orders (number, client_id, date, due, status, payment, paid, notes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		number, o.ClientID, o.Date, o.Due, o.Status, o.Payment, boolToInt(o.Paid), o.Notes,
+		`INSERT INTO orders (number, client_id, date, due, due_time, status, payment,
+		                     paid, notes, discount_percent, rush_percent)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		number, o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
+		boolToInt(o.Paid), o.Notes, o.DiscountPercent, o.RushPercent,
 	)
 	if err != nil {
 		return Order{}, err
@@ -156,9 +161,11 @@ func (s *Store) UpdateOrder(id int64, o Order) (Order, error) {
 	defer tx.Rollback()
 
 	res, err := tx.Exec(
-		`UPDATE orders SET client_id = ?, date = ?, due = ?, status = ?,
-		        payment = ?, paid = ?, notes = ? WHERE id = ?`,
-		o.ClientID, o.Date, o.Due, o.Status, o.Payment, boolToInt(o.Paid), o.Notes, id,
+		`UPDATE orders SET client_id = ?, date = ?, due = ?, due_time = ?, status = ?,
+		        payment = ?, paid = ?, notes = ?, discount_percent = ?, rush_percent = ?
+		 WHERE id = ?`,
+		o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
+		boolToInt(o.Paid), o.Notes, o.DiscountPercent, o.RushPercent, id,
 	)
 	if err != nil {
 		return Order{}, err

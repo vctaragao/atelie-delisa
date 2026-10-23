@@ -3,17 +3,25 @@
   import Dashboard from './routes/Dashboard.svelte'
   import Clientes from './routes/Clientes.svelte'
   import Ordens from './routes/Ordens.svelte'
+  import Agenda from './routes/Agenda.svelte'
   import Financeiro from './routes/Financeiro.svelte'
+  import Relatorios from './routes/Relatorios.svelte'
   import Servicos from './routes/Servicos.svelte'
   import Backup from './routes/Backup.svelte'
   import OrderModal from './routes/OrderModal.svelte'
 
+  // botaoProprio: a tela já tem o seu próprio botão de cadastrar, na barra
+  // logo abaixo do título. Nessas, o "+ Novo pedido" do topo não aparece: em
+  // Ordens ele era o mesmo botão duas vezes, e em Clientes e Serviços ficava
+  // encostado num botão igualzinho que faz outra coisa.
   const pages = [
     { id: 'dashboard', icon: '⌂', label: 'Dashboard', title: 'Dashboard', subtitle: 'Visão geral do seu ateliê', component: Dashboard },
-    { id: 'clientes', icon: '♙', label: 'Clientes', title: 'Clientes', subtitle: 'Cadastro e histórico', component: Clientes },
-    { id: 'ordens', icon: '✂', label: 'Ordens de serviço', title: 'Ordens de serviço', subtitle: 'Acompanhe cada peça do início à entrega', component: Ordens },
+    { id: 'clientes', icon: '♙', label: 'Clientes', title: 'Clientes', subtitle: 'Cadastro e histórico', component: Clientes, botaoProprio: true },
+    { id: 'ordens', icon: '✂', label: 'Ordens de serviço', title: 'Ordens de serviço', subtitle: 'Acompanhe cada peça do início à entrega', component: Ordens, botaoProprio: true },
+    { id: 'agenda', icon: '☰', label: 'Agenda', title: 'Agenda', subtitle: 'As entregas de cada dia, por horário', component: Agenda },
     { id: 'financeiro', icon: 'R$', label: 'Financeiro', title: 'Financeiro', subtitle: 'Entradas, saídas e valores a receber', component: Financeiro },
-    { id: 'servicos', icon: '☷', label: 'Serviços', title: 'Serviços', subtitle: 'Sua tabela de preços', component: Servicos },
+    { id: 'relatorios', icon: '◱', label: 'Relatórios', title: 'Relatórios', subtitle: 'O fechamento de um período do ateliê', component: Relatorios },
+    { id: 'servicos', icon: '☷', label: 'Serviços', title: 'Serviços', subtitle: 'Sua tabela de preços', component: Servicos, botaoProprio: true },
     { id: 'backup', icon: '↕', label: 'Backup', title: 'Backup', subtitle: 'Proteja os dados do seu ateliê', component: Backup },
   ]
 
@@ -82,7 +90,9 @@
         <h1>{page.title}</h1>
         <p>{page.subtitle}</p>
       </div>
-      <button class="btn gold" onclick={openNewOrder}>+ Novo pedido</button>
+      {#if !page.botaoProprio}
+        <button class="btn gold" onclick={openNewOrder}>+ Novo pedido</button>
+      {/if}
     </header>
 
     {#if data.error}

@@ -1,9 +1,11 @@
 <script>
   import Modal from '../lib/Modal.svelte'
+  import ImportarCsv from '../lib/ImportarCsv.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
 
   let query = $state('')
+  let importando = $state(false)
   let editing = $state(null) // null = fechado, {} = novo, {id,...} = edição
   let saving = $state(false)
   let formError = $state(null)
@@ -60,6 +62,7 @@
     placeholder="Buscar cliente por nome ou telefone..."
     bind:value={query}
   />
+  <button class="btn light" onclick={() => (importando = true)}>↑ Importar CSV</button>
   <button class="btn" onclick={() => open(null)}>+ Novo cliente</button>
 </div>
 
@@ -90,6 +93,10 @@
     </table>
   </div>
 </div>
+
+{#if importando}
+  <ImportarCsv tipo="clientes" onclose={() => (importando = false)} />
+{/if}
 
 {#if editing}
   <Modal

@@ -1,15 +1,17 @@
 <script>
   import OrderModal from './OrderModal.svelte'
   import Comprovante from './Comprovante.svelte'
+  import AvisarWhatsapp from '../lib/AvisarWhatsapp.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
-  import { money, fmtDate, statusClass, ORDER_STATUSES } from '../lib/format.js'
+  import { money, fmtDateTime, statusClass, ORDER_STATUSES } from '../lib/format.js'
 
   let query = $state('')
   let statusFilter = $state('')
   let editing = $state(null)
   let creating = $state(false)
   let printing = $state(null)
+  let avisando = $state(null)
 
   const filtered = $derived.by(() => {
     const q = query.trim().toLowerCase()
@@ -73,12 +75,23 @@
                 {item.qty}× {item.name}<br />
               {/each}
             </td>
-            <td>{fmtDate(o.due)}</td>
+            <td>{fmtDateTime(o.due, o.dueTime)}</td>
             <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
             <td>
               {money(o.totalCents)}
               {#if o.paid}
                 <span class="badge pago" style="margin-left:6px">pago</span>
+              {/if}
+              {#if o.discountPercent || o.rushPercent}
+                <span class="ajuste-total">
+                  {#if o.discountPercent}
+                    <span class="desconto">−{o.discountPercent}% desconto</span>
+                  {/if}
+                  {#if o.discountPercent && o.rushPercent}·{/if}
+                  {#if o.rushPercent}
+                    <span class="acrescimo">+{o.rushPercent}% urgência</span>
+                  {/if}
+                </span>
               {/if}
             </td>
             <td>
@@ -86,6 +99,9 @@
                 <button class="btn light small" onclick={() => (editing = o)}>Editar</button>
                 <button class="btn light small" onclick={() => (printing = o)}>
                   Comprovante
+                </button>
+                <button class="btn light small" onclick={() => (avisando = o)}>
+                  Avisar
                 </button>
                 <button class="btn danger small" onclick={() => remove(o)}>Excluir</button>
               </div>
@@ -109,4 +125,8 @@
 
 {#if printing}
   <Comprovante order={printing} onclose={() => (printing = null)} />
+{/if}
+
+{#if avisando}
+  <AvisarWhatsapp order={avisando} onclose={() => (avisando = null)} />
 {/if}

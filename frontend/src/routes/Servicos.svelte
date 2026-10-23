@@ -1,10 +1,12 @@
 <script>
   import Modal from '../lib/Modal.svelte'
+  import ImportarCsv from '../lib/ImportarCsv.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
   import { money, toCents, fromCents } from '../lib/format.js'
 
   let editing = $state(null)
+  let importando = $state(false)
   let saving = $state(false)
   let formError = $state(null)
 
@@ -55,6 +57,7 @@
       Cadastre seus serviços e preços para agilizar os pedidos.
     </p>
   </div>
+  <button class="btn light" onclick={() => (importando = true)}>↑ Importar CSV</button>
   <button class="btn" onclick={() => open(null)}>+ Novo serviço</button>
 </div>
 
@@ -85,6 +88,10 @@
     </table>
   </div>
 </div>
+
+{#if importando}
+  <ImportarCsv tipo="servicos" onclose={() => (importando = false)} />
+{/if}
 
 {#if editing}
   <Modal title={editing.id ? 'Editar serviço' : 'Novo serviço'} onclose={() => (editing = null)}>

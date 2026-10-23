@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"atelie/backend/internal/store"
 )
@@ -232,6 +233,21 @@ func (s *Server) deleteOrder(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 	o.Notes = strings.TrimSpace(o.Notes)
+	o.Due = strings.TrimSpace(o.Due)
+	o.DueTime = strings.TrimSpace(o.DueTime)
+
+	// Hora sem dia não tem onde aparecer na agenda, que é organizada por data.
+	// Em vez de recusar o pedido, descarta a hora solta.
+	if o.Due == "" {
+		o.DueTime = ""
+	}
+	if o.DueTime != "" {
+		if _, err := time.Parse("15:04", o.DueTime); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity,
+				"O horário de entrega deve estar no formato HH:MM, como 14:30.")
+			return false
+		}
+	}
 
 	if _, err := s.st.GetClient(o.ClientID); err != nil {
 		writeErr(w, http.StatusUnprocessableEntity, "Selecione um cliente válido.")
@@ -247,6 +263,20 @@ func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 	}
 	if o.Payment == "" {
 		o.Payment = "Não informado"
+	}
+	// Desconto não passa de 100%: acima disso o ateliê estaria pagando para
+	// trabalhar. A urgência vai até 100%, que é cobrar o dobro — o teto existe
+	// para um dígito a mais na pressa não virar uma conta absurda no
+	// comprovante da cliente.
+	if o.DiscountPercent < 0 || o.DiscountPercent > 100 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"O desconto deve ser de 0% a 100%.")
+		return false
+	}
+	if o.RushPercent < 0 || o.RushPercent > 100 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"O acréscimo de urgência deve ser de 0% a 100%.")
+		return false
 	}
 	if len(o.Items) == 0 {
 		writeErr(w, http.StatusUnprocessableEntity, "Adicione pelo menos um serviço ao pedido.")
@@ -329,6 +359,42 @@ func (s *Server) deleteTransaction(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) summary(w http.ResponseWriter, r *http.Request) {
 	out, err := s.st.Summary()
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// report fecha um período. Sem datas na URL, devolve os últimos 30 dias, que
+// é o que a tela abre mostrando.
+func (s *Server) report(w http.ResponseWriter, r *http.Request) {
+	const dia = "2006-01-02"
+
+	hoje := time.Now()
+	from := strings.TrimSpace(r.URL.Query().Get("from"))
+	to := strings.TrimSpace(r.URL.Query().Get("to"))
+	if from == "" {
+		from = hoje.AddDate(0, 0, -29).Format(dia)
+	}
+	if to == "" {
+		to = hoje.Format(dia)
+	}
+
+	for _, d := range []string{from, to} {
+		if _, err := time.Parse(dia, d); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity,
+				"Data inválida no período do relatório.")
+			return
+		}
+	}
+	if from > to {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"A data inicial do período vem depois da final.")
+		return
+	}
+
+	out, err := s.st.Report(from, to)
 	if err != nil {
 		writeStoreErr(w, err)
 		return

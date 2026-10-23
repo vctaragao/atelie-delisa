@@ -276,10 +276,13 @@ Base: `/api`. Todos os valores monetários são **centavos inteiros**
 |---|---|---|
 | GET | `/health` | verificação de saúde |
 | GET | `/summary` | métricas do dashboard e do financeiro |
+| GET | `/report?from=&to=` | fechamento de um período (padrão: últimos 30 dias) |
 | GET POST | `/clients` | listar, criar |
 | PUT DELETE | `/clients/{id}` | atualizar, excluir |
+| POST | `/clients/import` | importar clientes de um CSV |
 | GET POST | `/services` | listar, criar |
 | PUT DELETE | `/services/{id}` | atualizar, excluir |
+| POST | `/services/import` | importar serviços de um CSV |
 | GET POST | `/orders` | listar, criar |
 | GET PUT DELETE | `/orders/{id}` | detalhar, atualizar, excluir |
 | GET POST | `/transactions` | listar, criar |
@@ -292,6 +295,24 @@ Exemplo:
 
 ```powershell
 curl http://localhost:8080/api/summary
+```
+
+### Importação por CSV
+
+As duas rotas de `import` recebem o **arquivo cru** (`Content-Type: text/csv`),
+não um JSON: é o que preserva os acentos de uma planilha salva pelo Excel, que
+não grava em UTF-8 — o backend detecta a codificação e o separador (`;`, `,`
+ou tabulação). Com `?update=1`, as linhas que já existem são atualizadas; sem
+ele, são deixadas como estão. A resposta é um relatório com quantas linhas
+entraram, quantas foram atualizadas e o motivo de cada uma que ficou de fora.
+
+As colunas são reconhecidas pelo título na primeira linha, ignorando caixa e
+acento (`nome`, `telefone`, `endereco`, `observacoes`; `nome`, `categoria`,
+`preco`, `tempo`). Sem um cabeçalho reconhecível, valem pela ordem.
+
+```powershell
+curl -X POST http://localhost:8080/api/clients/import `
+  -H "Content-Type: text/csv" --data-binary "@clientes.csv"
 ```
 
 ## Backup
