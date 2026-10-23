@@ -13,7 +13,7 @@
    contrariam os termos de uso e colocam o número do ateliê em risco de
    bloqueio — por isso não estão aqui. */
 
-import { money, fmtDate, orderQty } from './format.js'
+import { money, fmtDate, orderQty, groupItemsByPiece, listItems } from './format.js'
 
 /**
  * O telefone da ficha no formato que o link do WhatsApp espera: só dígitos,
@@ -51,9 +51,12 @@ function primeiroNome(nome) {
   return partes[0] || 'tudo bem'
 }
 
-/** As peças do pedido em uma linha: "2× Bainha de calça, 1× Troca de zíper". */
+/** Os serviços do pedido, agrupados pela peça de roupa:
+    "calça jeans (1× Bainha, 1× Ajuste de cintura), 1× Troca de zíper". */
 function listaDePecas(order) {
-  return (order.items || []).map((i) => `${i.qty}× ${i.name}`).join(', ')
+  return groupItemsByPiece(order.items)
+    .map((g) => (g.peca ? `${g.peca} (${listItems(g.itens)})` : listItems(g.itens)))
+    .join(', ')
 }
 
 function entregaCombinada(order) {
@@ -62,58 +65,65 @@ function entregaCombinada(order) {
   return order.dueTime ? `${dia} às ${order.dueTime}` : dia
 }
 
-/* Os modelos de mensagem. O texto é só o ponto de partida: a tela mostra numa
-   caixa editável, e ela ajusta antes de abrir o WhatsApp. */
-export const MODELOS = [
-  {
-    id: 'pronto',
-    label: 'Serviço pronto para retirada',
-    texto: (order) => {
-      const linhas = [
-        `Oi, ${primeiroNome(order.clientName)}! Aqui é do Ateliê Delisa.`,
-        '',
-        `Seu pedido #${order.number} está pronto: ${listaDePecas(order)}.`,
-        `Total: ${money(order.totalCents)}${order.paid ? ' (já pago).' : ' (a pagar na retirada).'}`,
-        '',
-        'Pode passar para retirar quando quiser. Qualquer dúvida, é só responder por aqui.',
-      ]
-      return linhas.join('\n')
-    },
-  },
-  {
-    id: 'prazo',
-    label: 'Lembrete da data de entrega',
-    texto: (order) => {
-      const quando = entregaCombinada(order)
-      return [
-        `Oi, ${primeiroNome(order.clientName)}! Aqui é do Ateliê Delisa.`,
-        '',
-        `Passando para lembrar do seu pedido #${order.number} ` +
-          `(${orderQty(order)} ${orderQty(order) === 1 ? 'peça' : 'peças'})` +
-          (quando ? `, combinado para ${quando}.` : '.'),
-        '',
-        'Se precisar mudar o horário, me avise que a gente ajeita.',
-      ].join('\n')
-    },
-  },
-  {
-    id: 'pagamento',
-    label: 'Lembrete de pagamento',
-    texto: (order) =>
-      [
-        `Oi, ${primeiroNome(order.clientName)}! Aqui é do Ateliê Delisa.`,
-        '',
-        `Sobre o pedido #${order.number}: ficou pendente o valor de ` +
-          `${money(order.totalCents)}.`,
-        '',
-        'Pode pagar na retirada ou por Pix, como ficar melhor para você.',
-      ].join('\n'),
-  },
+/* Os apelidos que podem aparecer no texto de uma mensagem. A tela de
+   Mensagens mostra esta lista, e é por ela que a Maria sabe o que pode
+   escrever entre chaves. */
+export const APELIDOS = [
+  { chave: '{cliente}', descricao: 'o primeiro nome da cliente' },
+  { chave: '{cliente_completo}', descricao: 'o nome completo da cliente' },
+  { chave: '{pedido}', descricao: 'o número do pedido' },
+  { chave: '{servicos}', descricao: 'as peças e os serviços do pedido' },
+  { chave: '{pecas}', descricao: 'quantas peças o pedido tem' },
+  { chave: '{total}', descricao: 'o valor total' },
+  { chave: '{pagamento}', descricao: '"já pago" ou "a pagar na retirada"' },
+  { chave: '{entrega}', descricao: 'a data e a hora da entrega' },
+  { chave: '{situacao}', descricao: 'a situação do pedido' },
 ]
 
-/** O modelo que faz mais sentido para a situação atual do pedido. */
-export function modeloSugerido(order) {
-  if (order.status === 'Pronto') return 'pronto'
-  if (!order.paid && order.status === 'Entregue') return 'pagamento'
-  return 'prazo'
+/**
+ * Troca os apelidos do texto pelos dados do pedido.
+ *
+ * Apelido que não existe fica como está, escrito mesmo: é melhor a mensagem
+ * mostrar "{clinte}" e ela ver o erro de digitação do que o aviso chegar na
+ * cliente com um buraco no meio.
+ */
+export function preencherMensagem(texto, order) {
+  const valores = {
+    cliente: primeiroNome(order.clientName),
+    cliente_completo: String(order.clientName ?? '').trim(),
+    pedido: order.number ?? '',
+    servicos: listaDePecas(order),
+    pecas: String(orderQty(order)),
+    total: money(order.totalCents),
+    pagamento: order.paid ? 'já pago' : 'a pagar na retirada',
+    entrega: entregaCombinada(order) || 'a combinar',
+    situacao: order.status ?? '',
+  }
+
+  return String(texto ?? '').replace(/\{([a-z_]+)\}/g, (inteiro, chave) =>
+    chave in valores ? valores[chave] : inteiro,
+  )
+}
+
+/** A mensagem que já vem escolhida para a situação atual do pedido. */
+export function mensagemSugerida(mensagens, order) {
+  const lista = mensagens || []
+  return lista.find((m) => m.suggestStatus && m.suggestStatus === order.status) || lista[0] || null
+}
+
+/* Um pedido de mentira, para a tela de Mensagens mostrar como o texto fica
+   preenchido antes de a Maria usá-lo com uma cliente de verdade. */
+export const PEDIDO_DE_EXEMPLO = {
+  number: '0042',
+  clientName: 'Ana Maria Souza',
+  status: 'Pronto',
+  paid: false,
+  due: '2026-03-15',
+  dueTime: '14:30',
+  totalCents: 11000,
+  items: [
+    { id: 1, name: 'Bainha', piece: 'Calça jeans', qty: 1, priceCents: 2500 },
+    { id: 2, name: 'Ajuste de cintura', piece: 'Calça jeans', qty: 1, priceCents: 3500 },
+    { id: 3, name: 'Troca de zíper', piece: 'Vestido de festa', qty: 1, priceCents: 3500 },
+  ],
 }

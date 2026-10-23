@@ -1,7 +1,12 @@
 <script>
   import Modal from './Modal.svelte'
   import { data } from './data.svelte.js'
-  import { MODELOS, modeloSugerido, numeroWhatsapp, linkWhatsapp } from './whatsapp.js'
+  import {
+    mensagemSugerida,
+    preencherMensagem,
+    numeroWhatsapp,
+    linkWhatsapp,
+  } from './whatsapp.js'
 
   let { order, onclose } = $props()
 
@@ -10,13 +15,18 @@
   const cliente = $derived(data.clients.find((c) => c.id === order.clientId))
   const numero = $derived(numeroWhatsapp(cliente?.phone))
 
-  let modelo = $state(modeloSugerido(order))
-  let texto = $state(MODELOS.find((m) => m.id === modeloSugerido(order)).texto(order))
+  // A mensagem combinada com a situação do pedido já vem escolhida; as outras
+  // ficam no seletor. Os textos são os que ela escreveu na aba Mensagens.
+  const sugerida = mensagemSugerida(data.messages, order)
+
+  let escolhidaId = $state(sugerida?.id ?? 0)
+  let texto = $state(sugerida ? preencherMensagem(sugerida.body, order) : '')
   let copiado = $state(false)
 
-  function trocarModelo(id) {
-    modelo = id
-    texto = MODELOS.find((m) => m.id === id).texto(order)
+  function trocarMensagem(id) {
+    escolhidaId = Number(id)
+    const m = data.messages.find((x) => x.id === escolhidaId)
+    texto = m ? preencherMensagem(m.body, order) : ''
     copiado = false
   }
 
@@ -58,14 +68,25 @@
       <b>{cliente.phone}</b>. Quem aperta enviar é você — nada sai daqui sozinho.
     </div>
 
-    <div class="form-group">
-      <label for="wmodelo">Mensagem</label>
-      <select id="wmodelo" value={modelo} onchange={(e) => trocarModelo(e.currentTarget.value)}>
-        {#each MODELOS as m (m.id)}
-          <option value={m.id}>{m.label}</option>
-        {/each}
-      </select>
-    </div>
+    {#if data.messages.length === 0}
+      <div class="notice error">
+        Não há nenhuma mensagem cadastrada. Escreva uma na aba <b>Mensagens</b>,
+        ou use o botão de restaurar as mensagens padrão que há lá.
+      </div>
+    {:else}
+      <div class="form-group">
+        <label for="wmodelo">Mensagem</label>
+        <select
+          id="wmodelo"
+          value={String(escolhidaId)}
+          onchange={(e) => trocarMensagem(e.currentTarget.value)}
+        >
+          {#each data.messages as m (m.id)}
+            <option value={String(m.id)}>{m.name}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
 
     <div class="form-group">
       <label for="wtexto">
@@ -79,7 +100,7 @@
   <div class="modal-foot">
     <button type="button" class="btn light" onclick={onclose}>Fechar</button>
     {#if numero}
-      <button type="button" class="btn light" onclick={copiar}>
+      <button type="button" class="btn light" onclick={copiar} disabled={!texto.trim()}>
         {copiado ? 'Copiado!' : 'Copiar texto'}
       </button>
       <button type="button" class="btn" onclick={abrir} disabled={!texto.trim()}>

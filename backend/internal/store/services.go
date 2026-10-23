@@ -6,9 +6,12 @@ import (
 )
 
 func (s *Store) ListServices() ([]Service, error) {
+	// Ordem alfabética pelo nome, e não por categoria: é pelo nome que ela
+	// procura o serviço, tanto na tabela de preços quanto no seletor do pedido.
+	// O desempate por id mantém a ordem estável entre dois nomes iguais.
 	rows, err := s.db.Query(
 		`SELECT id, name, category, price_cents, time FROM services
-		 ORDER BY category COLLATE NOCASE, name COLLATE NOCASE`)
+		 ORDER BY name COLLATE NOCASE, id`)
 	if err != nil {
 		return nil, err
 	}

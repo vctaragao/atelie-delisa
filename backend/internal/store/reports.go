@@ -92,6 +92,10 @@ func (s *Store) Export() (Backup, error) {
 	if err != nil {
 		return Backup{}, err
 	}
+	messages, err := s.ListMessages()
+	if err != nil {
+		return Backup{}, err
+	}
 
 	return Backup{
 		Version:      1,
@@ -100,6 +104,7 @@ func (s *Store) Export() (Backup, error) {
 		Services:     services,
 		Orders:       orders,
 		Transactions: txs,
+		Messages:     messages,
 	}, nil
 }
 
@@ -162,6 +167,25 @@ func (s *Store) Import(b Backup) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Arquivo gerado antes das mensagens existirem não traz a lista. Apagar as
+	// mensagens atuais nesse caso seria perder o texto dela por causa da idade
+	// do backup.
+	if b.Messages != nil {
+		if _, err := tx.Exec(`DELETE FROM message_templates`); err != nil {
+			return err
+		}
+		for _, m := range b.Messages {
+			_, err := tx.Exec(
+				`INSERT INTO message_templates (id, name, body, suggest_status, position)
+				 VALUES (?, ?, ?, ?, ?)`,
+				m.ID, m.Name, m.Body, m.SuggestStatus, m.Position,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

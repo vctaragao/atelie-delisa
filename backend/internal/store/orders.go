@@ -75,7 +75,7 @@ func (s *Store) attachItems(orders []Order, byID map[int64]int) error {
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
 
 	rows, err := s.db.Query(
-		`SELECT order_id, id, service_id, name, qty, price_cents
+		`SELECT order_id, id, service_id, name, piece, qty, price_cents
 		 FROM order_items WHERE order_id IN (`+placeholders+`)
 		 ORDER BY order_id, position, id`, ids...)
 	if err != nil {
@@ -87,7 +87,7 @@ func (s *Store) attachItems(orders []Order, byID map[int64]int) error {
 		var orderID int64
 		var it OrderItem
 		var serviceID sql.NullInt64
-		if err := rows.Scan(&orderID, &it.ID, &serviceID, &it.Name, &it.Qty, &it.PriceCents); err != nil {
+		if err := rows.Scan(&orderID, &it.ID, &serviceID, &it.Name, &it.Piece, &it.Qty, &it.PriceCents); err != nil {
 			return err
 		}
 		idx, ok := byID[orderID]
@@ -225,9 +225,9 @@ func replaceItems(tx *sql.Tx, orderID int64, items []OrderItem) error {
 			serviceID = *it.ServiceID
 		}
 		_, err := tx.Exec(
-			`INSERT INTO order_items (order_id, service_id, name, qty, price_cents, position)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
-			orderID, serviceID, it.Name, it.Qty, it.PriceCents, i,
+			`INSERT INTO order_items (order_id, service_id, name, piece, qty, price_cents, position)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			orderID, serviceID, it.Name, it.Piece, it.Qty, it.PriceCents, i,
 		)
 		if err != nil {
 			return err

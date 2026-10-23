@@ -14,6 +14,8 @@
     statusClass,
     orderQty,
     today,
+    groupItemsByPiece,
+    listItems,
     DIAS_DA_SEMANA,
   } from '../lib/format.js'
 
@@ -150,8 +152,9 @@
               <td><b>#{o.number}</b></td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each o.items as item (item.id)}
-                  {item.qty}× {item.name}<br />
+                {#each groupItemsByPiece(o.items) as g (g.peca)}
+                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+                  {listItems(g.itens)}<br />
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>
@@ -264,8 +267,9 @@
               <td><b>#{o.number}</b></td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each o.items as item (item.id)}
-                  {item.qty}× {item.name}<br />
+                {#each groupItemsByPiece(o.items) as g (g.peca)}
+                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+                  {listItems(g.itens)}<br />
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>
@@ -320,8 +324,9 @@
               <td><b>#{o.number}</b></td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each o.items as item (item.id)}
-                  {item.qty}× {item.name}<br />
+                {#each groupItemsByPiece(o.items) as g (g.peca)}
+                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+                  {listItems(g.itens)}<br />
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>

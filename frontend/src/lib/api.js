@@ -79,6 +79,12 @@ export const api = {
   updateOrder: (id, o) => put(`/orders/${id}`, o),
   deleteOrder: (id) => del(`/orders/${id}`),
 
+  listMessages: () => get('/messages'),
+  createMessage: (m) => post('/messages', m),
+  updateMessage: (id, m) => put(`/messages/${id}`, m),
+  deleteMessage: (id) => del(`/messages/${id}`),
+  restoreMessages: () => post('/messages/restore'),
+
   listTransactions: () => get('/transactions'),
   createTransaction: (t) => post('/transactions', t),
   deleteTransaction: (id) => del(`/transactions/${id}`),

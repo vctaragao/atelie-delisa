@@ -285,6 +285,9 @@ Base: `/api`. Todos os valores monetários são **centavos inteiros**
 | POST | `/services/import` | importar serviços de um CSV |
 | GET POST | `/orders` | listar, criar |
 | GET PUT DELETE | `/orders/{id}` | detalhar, atualizar, excluir |
+| GET POST | `/messages` | listar, criar as mensagens do WhatsApp |
+| PUT DELETE | `/messages/{id}` | atualizar, excluir |
+| POST | `/messages/restore` | voltar às mensagens padrão |
 | GET POST | `/transactions` | listar, criar |
 | DELETE | `/transactions/{id}` | excluir |
 | GET | `/backup` | exportar tudo em JSON |
