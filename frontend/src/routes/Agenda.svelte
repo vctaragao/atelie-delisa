@@ -16,6 +16,7 @@
     today,
     groupItemsByPiece,
     listItems,
+    porHora,
     DIAS_DA_SEMANA,
   } from '../lib/format.js'
 
@@ -44,15 +45,6 @@
 
   const emAberto = (o) => !CONCLUIDOS.includes(o.status)
   const visivel = (o) => mostrarConcluidos || emAberto(o)
-
-  /** Ordena pela hora combinada. Quem não tem hora marcada cai no fim do dia,
-      não na frente de quem tem horário. */
-  function porHora(a, b) {
-    const ha = a.dueTime || '99:99'
-    const hb = b.dueTime || '99:99'
-    if (ha !== hb) return ha < hb ? -1 : 1
-    return Number(a.number) - Number(b.number)
-  }
 
   // Todos os pedidos com data, agrupados pelo dia da entrega. O calendário lê
   // este mapa quadradinho por quadradinho, em vez de varrer a lista inteira
@@ -105,7 +97,24 @@
     const dias = [...porDia.keys()].filter((d) => monthOf(d) === mes).sort()
     diaSelecionado = dias[0] ?? null
   }
+
+  /** Abre a agenda numa janela só dela, para ficar aberta numa segunda tela.
+      A janela recebe um nome: clicar de novo traz de volta a mesma, em vez de
+      empilhar um quadro novo a cada clique. */
+  function abrirPainel() {
+    const janela = window.open(
+      `${location.pathname}?painel=agenda`,
+      'atelie-painel-agenda',
+      'popup=yes,width=1150,height=900',
+    )
+    janela?.focus()
+  }
 </script>
+
+<div class="toolbar">
+  <span style="flex:1"></span>
+  <button class="btn light" onclick={abrirPainel}>⧉ Abrir quadro em outra janela</button>
+</div>
 
 <div class="cards">
   <div class="card">
