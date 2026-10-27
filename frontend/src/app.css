@@ -741,3 +741,200 @@ label {
    os campos ficam mais juntos para não competir com o pedido em volta. */
 .novo-cliente .form-group { margin-bottom: 10px; }
 .novo-cliente-foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Quadro da agenda — a janela que fica aberta numa segunda tela.
+
+   É a mesma página do sistema carregada com ?painel=agenda, e nada aqui se
+   mistura com as telas: toda regra começa em .painel. O fundo é escuro de
+   propósito. O quadro é lido de longe e de pé, não de perto com o mouse na
+   mão, e o escuro também deixa óbvio, num relance, qual das duas janelas é
+   o quadro e qual é o sistema.
+
+   Por isso tudo é maior que no resto do sistema, e por isso o quadro não tem
+   nenhum botão de editar: é para olhar, não para operar. O trabalho acontece
+   na outra janela. */
+.painel {
+  min-height: 100vh;
+  background: var(--teal);
+  color: #fff;
+  padding: 26px 30px 34px;
+}
+
+.painel-topo {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.painel-topo small {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.painel-topo h1 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 34px;
+  margin: 6px 0 0;
+}
+.painel-relogio {
+  font-size: 46px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.painel-numeros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 20px 0 26px;
+}
+.painel-numeros > div {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.painel-numeros span {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.painel-numeros strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 40px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+/* O atraso é o único número que troca de cor: é o que ela precisa enxergar
+   de longe, sem procurar. O vermelho do sistema não tem contraste suficiente
+   sobre o fundo escuro, então aqui ele clareia. */
+.painel-numeros .alerta {
+  background: rgba(182, 75, 75, 0.25);
+  border-color: rgba(255, 170, 170, 0.45);
+}
+.painel-numeros .alerta strong { color: #ffc9c9; }
+
+.painel-bloco { margin-bottom: 26px; }
+.painel-bloco h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+.painel-bloco.atrasado h2 { color: #ffc9c9; }
+
+.painel-linha {
+  display: grid;
+  grid-template-columns: 112px 1fr auto;
+  gap: 18px;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 4px solid var(--gold);
+  border-radius: 10px;
+  padding: 13px 18px;
+  margin-bottom: 9px;
+}
+.painel-bloco.atrasado .painel-linha {
+  background: rgba(182, 75, 75, 0.18);
+  border-left-color: #e08a8a;
+}
+
+.painel-hora {
+  font-size: 29px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+/* Nas atrasadas a hora vem embaixo do dia, menor: ali o dia é o que importa. */
+.painel-hora small {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.painel-quem strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 600;
+}
+.painel-quem span {
+  display: block;
+  margin-top: 3px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.painel-fim {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.painel-qtd {
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.painel-num {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+/* O que já foi entregue hoje continua à vista, apagado: serve para conferir
+   o que saiu, sem competir com o que ainda falta. */
+.painel-linha.feito {
+  opacity: 0.45;
+  border-left-color: rgba(255, 255, 255, 0.3);
+}
+
+/* As pílulas de status são claras com texto escuro — continuam legíveis
+   sobre o fundo escuro do quadro, só precisam crescer junto com o resto. */
+.painel .badge {
+  font-size: 13px;
+  padding: 5px 11px;
+}
+
+.painel-vazio {
+  padding: 18px 2px;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.painel-erro {
+  background: rgba(182, 75, 75, 0.25);
+  border: 1px solid rgba(255, 170, 170, 0.45);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-top: 18px;
+  color: #ffd6d6;
+}
+.painel-rodape {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 14px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* Janela estreita — ela pode deixar o quadro em meia tela. */
+@media (max-width: 820px) {
+  .painel { padding: 20px 18px 26px; }
+  .painel-topo { flex-direction: column; align-items: flex-start; }
+  .painel-topo h1 { font-size: 27px; }
+  .painel-relogio { font-size: 36px; }
+  .painel-numeros { grid-template-columns: repeat(2, 1fr); }
+  .painel-linha { grid-template-columns: 90px 1fr; }
+  .painel-hora { font-size: 24px; }
+  .painel-quem strong { font-size: 19px; }
+  .painel-fim { grid-column: 1 / -1; }
+}

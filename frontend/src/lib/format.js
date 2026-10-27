@@ -122,6 +122,20 @@ export function fmtDayTitle(iso, hoje = today()) {
   return titulo
 }
 
+/**
+ * Ordena pedidos pela hora combinada da entrega. Quem não tem hora marcada
+ * cai no fim do dia, não na frente de quem tem horário.
+ *
+ * Fica aqui porque a tela da agenda e o quadro da segunda tela precisam
+ * listar o dia na mesma ordem.
+ */
+export function porHora(a, b) {
+  const ha = a.dueTime || '99:99'
+  const hb = b.dueTime || '99:99'
+  if (ha !== hb) return ha < hb ? -1 : 1
+  return Number(a.number) - Number(b.number)
+}
+
 /** Classe CSS do selo de status. */
 export function statusClass(status) {
   return {
