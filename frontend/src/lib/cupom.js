@@ -169,7 +169,18 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   }
   linhas.push(...par('TOTAL', money(pedido.totalCents)))
   linhas.push(...par('Pagamento', pedido.payment))
-  linhas.push(...par('Situação', pedido.paid ? 'PAGO' : 'PENDENTE'))
+
+  // A cliente leva no papel o que já pagou e o que falta. O sinal é a parte
+  // mais fácil de virar discussão no balcão duas semanas depois, e o
+  // comprovante é a única cópia que ela tem.
+  const pago = Number(pedido.paidCents) || 0
+  const falta = Math.max(0, Number(pedido.balanceCents) || 0)
+  if (pago > 0 && falta > 0) {
+    linhas.push(...par('Já pago', money(pago)))
+    linhas.push(...par('FALTA', money(falta)))
+  } else {
+    linhas.push(...par('Situação', falta === 0 && pedido.totalCents > 0 ? 'PAGO' : 'PENDENTE'))
+  }
 
   if (pedido.notes) {
     linhas.push(SEPARADOR)

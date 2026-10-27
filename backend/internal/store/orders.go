@@ -13,7 +13,8 @@ const orderCols = `
   o.date, o.due, o.due_time, o.status, o.payment, o.paid, o.notes,
   o.discount_percent, o.rush_percent,
   COALESCE(t.items_cents, 0), COALESCE(t.discount_cents, 0),
-  COALESCE(t.rush_cents, 0), COALESCE(t.total_cents, 0)`
+  COALESCE(t.rush_cents, 0), COALESCE(t.total_cents, 0),
+  COALESCE((SELECT SUM(p.value_cents) FROM order_payments p WHERE p.order_id = o.id), 0)`
 
 const orderFrom = `
   FROM orders o
@@ -27,12 +28,18 @@ func scanOrder(row interface{ Scan(...any) error }) (Order, error) {
 		&o.Date, &o.Due, &o.DueTime, &o.Status, &o.Payment, &o.Paid, &o.Notes,
 		&o.DiscountPercent, &o.RushPercent,
 		&o.ItemsCents, &o.DiscountCents, &o.RushCents, &o.TotalCents,
+		&o.PaidCents,
 	)
+	// O saldo pode ficar negativo: pagamento a mais existe, e esconder isso
+	// faria a tela mentir sobre o que a cliente entregou.
+	o.BalanceCents = o.TotalCents - o.PaidCents
 	o.Items = []OrderItem{}
+	o.Payments = []Payment{}
 	return o, err
 }
 
-// queryOrders roda uma consulta de pedidos e anexa os itens de cada um.
+// queryOrders roda uma consulta de pedidos e anexa os itens e os pagamentos
+// de cada um.
 func (s *Store) queryOrders(where string, args ...any) ([]Order, error) {
 	rows, err := s.db.Query(`SELECT `+orderCols+orderFrom+` `+where, args...)
 	if err != nil {
@@ -60,6 +67,9 @@ func (s *Store) queryOrders(where string, args ...any) ([]Order, error) {
 		return orders, nil
 	}
 	if err := s.attachItems(orders, byID); err != nil {
+		return nil, err
+	}
+	if err := s.attachPayments(orders, byID); err != nil {
 		return nil, err
 	}
 	return orders, nil
@@ -103,6 +113,39 @@ func (s *Store) attachItems(orders []Order, byID map[int64]int) error {
 	return rows.Err()
 }
 
+// attachPayments busca os pagamentos de todos os pedidos de uma vez, pelo mesmo
+// motivo de attachItems: uma consulta por pedido deixaria a lista de pedidos
+// lenta à medida que o ateliê trabalha.
+func (s *Store) attachPayments(orders []Order, byID map[int64]int) error {
+	ids := make([]any, 0, len(orders))
+	for _, o := range orders {
+		ids = append(ids, o.ID)
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+
+	rows, err := s.db.Query(
+		`SELECT `+paymentCols+` FROM order_payments
+		 WHERE order_id IN (`+placeholders+`)
+		 ORDER BY date, id`, ids...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		p, err := scanPayment(rows)
+		if err != nil {
+			return err
+		}
+		idx, ok := byID[p.OrderID]
+		if !ok {
+			continue // pedido fora da página consultada
+		}
+		orders[idx].Payments = append(orders[idx].Payments, p)
+	}
+	return rows.Err()
+}
+
 func (s *Store) ListOrders() ([]Order, error) {
 	return s.queryOrders(`ORDER BY o.date DESC, o.id DESC`)
 }
@@ -132,10 +175,10 @@ func (s *Store) CreateOrder(o Order) (Order, error) {
 
 	res, err := tx.Exec(
 		`INSERT INTO orders (number, client_id, date, due, due_time, status, payment,
-		                     paid, notes, discount_percent, rush_percent)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		                     notes, discount_percent, rush_percent)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		number, o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
-		boolToInt(o.Paid), o.Notes, o.DiscountPercent, o.RushPercent,
+		o.Notes, o.DiscountPercent, o.RushPercent,
 	)
 	if err != nil {
 		return Order{}, err
@@ -162,10 +205,10 @@ func (s *Store) UpdateOrder(id int64, o Order) (Order, error) {
 
 	res, err := tx.Exec(
 		`UPDATE orders SET client_id = ?, date = ?, due = ?, due_time = ?, status = ?,
-		        payment = ?, paid = ?, notes = ?, discount_percent = ?, rush_percent = ?
+		        payment = ?, notes = ?, discount_percent = ?, rush_percent = ?
 		 WHERE id = ?`,
 		o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
-		boolToInt(o.Paid), o.Notes, o.DiscountPercent, o.RushPercent, id,
+		o.Notes, o.DiscountPercent, o.RushPercent, id,
 	)
 	if err != nil {
 		return Order{}, err
@@ -176,8 +219,28 @@ func (s *Store) UpdateOrder(id int64, o Order) (Order, error) {
 	if err := replaceItems(tx, id, o.Items); err != nil {
 		return Order{}, err
 	}
+	// Mexer em preço ou quantidade muda o total, e com ele a conta do que já
+	// foi pago: um pedido quitado que encarece volta a ter saldo em aberto.
+	if err := syncPaid(tx, id); err != nil {
+		return Order{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return Order{}, err
+	}
+	return s.GetOrder(id)
+}
+
+// SetOrderStatus move o pedido de etapa, sem tocar em nada mais. É o que a
+// lista de ordens usa para a Maria mandar um pedido para produção com um
+// clique — mandar o pedido inteiro de volta só para trocar o status
+// reescreveria os itens à toa.
+func (s *Store) SetOrderStatus(id int64, status string) (Order, error) {
+	res, err := s.db.Exec(`UPDATE orders SET status = ? WHERE id = ?`, status, id)
+	if err != nil {
+		return Order{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Order{}, ErrNotFound
 	}
 	return s.GetOrder(id)
 }
@@ -191,15 +254,6 @@ func (s *Store) DeleteOrder(id int64) error {
 		return ErrNotFound
 	}
 	return nil
-}
-
-// boolToInt converte para o 0/1 que a coluna INTEGER espera. Passar um bool
-// direto depende de como o driver o traduz; assim o valor é explícito.
-func boolToInt(b bool) int64 {
-	if b {
-		return 1
-	}
-	return 0
 }
 
 // nextOrderNumber devolve o próximo número sequencial com 4 dígitos. Usa

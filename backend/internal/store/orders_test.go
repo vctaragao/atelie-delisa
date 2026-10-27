@@ -214,10 +214,12 @@ func TestFinanceiroContaOTotalComDesconto(t *testing.T) {
 		t.Errorf("a receber %d, esperava 22000 (200,00 - 10%% + 20%%)", sum.ReceivableCents)
 	}
 
-	// Pago, o mesmo valor líquido vira faturamento.
-	pedido.Paid = true
-	if _, err := s.UpdateOrder(pedido.ID, pedido); err != nil {
-		t.Fatalf("marcando como pago: %v", err)
+	// Pago, o mesmo valor líquido vira faturamento. Quem paga o pedido é um
+	// recebimento lançado, não um campo do formulário.
+	if _, err := s.CreatePayment(Payment{
+		OrderID: pedido.ID, Date: "2026-10-22", ValueCents: 22000, Method: "Pix",
+	}); err != nil {
+		t.Fatalf("dando baixa no pedido: %v", err)
 	}
 	sum, err = s.Summary()
 	if err != nil {

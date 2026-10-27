@@ -79,6 +79,12 @@ export const api = {
   updateOrder: (id, o) => put(`/orders/${id}`, o),
   deleteOrder: (id) => del(`/orders/${id}`),
 
+  // Trocar a etapa manda só a etapa: o pedido inteiro de volta reescreveria
+  // os serviços à toa. As três devolvem o pedido já com a conta refeita.
+  setOrderStatus: (id, status) => put(`/orders/${id}/status`, { status }),
+  addPayment: (id, p) => post(`/orders/${id}/payments`, p),
+  deletePayment: (id, paymentId) => del(`/orders/${id}/payments/${paymentId}`),
+
   listMessages: () => get('/messages'),
   createMessage: (m) => post('/messages', m),
   updateMessage: (id, m) => put(`/messages/${id}`, m),

@@ -1,7 +1,7 @@
 <script>
   import Modal from '../lib/Modal.svelte'
   import { api } from '../lib/api.js'
-  import { data, mutate, refresh } from '../lib/data.svelte.js'
+  import { data, refresh } from '../lib/data.svelte.js'
   import {
     money,
     toCents,
@@ -9,6 +9,8 @@
     today,
     orderAmounts,
     prazoEmHoras,
+    statusClass,
+    faltaReceber,
     ORDER_STATUSES,
     PAYMENT_METHODS,
     URGENCIA_HORAS,
@@ -28,7 +30,10 @@
     dueTime: order?.dueTime || '',
     status: order?.status || ORDER_STATUSES[0],
     payment: order?.payment || PAYMENT_METHODS[0],
-    paid: order?.paid ?? false,
+    // Só no pedido novo: é o dinheiro que a cliente deixa no balcão junto
+    // com a peça. Num pedido que já existe, a baixa é lançada pela tela de
+    // pagamentos, que guarda a data e a forma de cada recebimento.
+    recebido: '',
     notes: order?.notes || '',
     discountPercent: order?.discountPercent ?? 0,
     rushPercent: order?.rushPercent ?? 0,
@@ -247,7 +252,6 @@
       dueTime: form.due ? form.dueTime : '',
       status: form.status,
       payment: form.payment,
-      paid: form.paid,
       notes: form.notes,
       discountPercent: Number(form.discountPercent) || 0,
       rushPercent: Number(form.rushPercent) || 0,
@@ -255,16 +259,44 @@
     }
 
     saving = true
-    const ok = await mutate(() =>
-      editing ? api.updateOrder(order.id, payload) : api.createOrder(payload),
-    )
-    saving = false
-    if (ok) {
+    try {
+      const salvo = editing
+        ? await api.updateOrder(order.id, payload)
+        : await api.createOrder(payload)
+
+      // O que a cliente deixou no balcão vira uma baixa do pedido recém
+      // aberto. Só depois de ele existir: a baixa precisa de um pedido para
+      // apontar.
+      const recebido = toCents(form.recebido)
+      if (!editing && recebido > 0) {
+        try {
+          await api.addPayment(salvo.id, {
+            date: form.date || today(),
+            valueCents: recebido,
+            method: form.payment,
+            notes: 'Recebido na abertura do pedido',
+          })
+        } catch (err) {
+          // O pedido já foi gravado; só a baixa falhou. Fechar e avisar no
+          // topo evita o pior desfecho: ela salvar de novo e o ateliê ficar
+          // com o mesmo pedido duas vezes.
+          await refresh()
+          data.error =
+            `O pedido #${salvo.number} foi salvo, mas o pagamento de ` +
+            `${money(recebido)} não foi registrado: ${err.message} ` +
+            `Lance a baixa pelo botão Pagamentos.`
+          onclose()
+          return
+        }
+      }
+
+      await refresh()
       onclose()
-    } else {
+    } catch (err) {
       // Mostra o erro dentro do formulário, não no aviso global do topo.
-      formError = data.error
-      data.error = null
+      formError = err.message
+    } finally {
+      saving = false
     }
   }
 </script>
@@ -387,12 +419,21 @@
         {/if}
       </div>
       <div class="form-group">
-        <label for="ost">Status</label>
-        <select id="ost" bind:value={form.status}>
+        <!-- As etapas ficam à vista, e não escondidas num <select>: era isso
+             que fazia todo pedido nascer e morrer como orçamento. -->
+        <span class="pseudo-label">Etapa do pedido</span>
+        <div class="etapas" role="group" aria-label="Etapa do pedido">
           {#each ORDER_STATUSES as s (s)}
-            <option value={s}>{s}</option>
+            <button
+              type="button"
+              class="etapa {statusClass(s)}"
+              class:ativa={form.status === s}
+              onclick={() => (form.status = s)}
+            >
+              {s}
+            </button>
           {/each}
-        </select>
+        </div>
       </div>
     </div>
 
@@ -554,11 +595,29 @@
         </select>
       </div>
       <div class="form-group">
-        <label for="opaid">Pagamento</label>
-        <select id="opaid" bind:value={form.paid}>
-          <option value={false}>Pendente</option>
-          <option value={true}>Pago</option>
-        </select>
+        {#if editing}
+          <span class="pseudo-label">Pagamento</span>
+          <div class="pagamento-resumo">
+            {#if faltaReceber(order) === 0}
+              <span class="badge pago">pago</span>
+            {:else}
+              <span class="devendo">falta {money(faltaReceber(order))}</span>
+              {#if order.paidCents > 0}
+                <span class="agenda-resumo">de {money(order.totalCents)}</span>
+              {/if}
+            {/if}
+          </div>
+          <p class="field-dica">
+            Para dar baixa, use o botão Pagamentos na lista de ordens: lá cada
+            valor recebido fica com a sua data e a sua forma.
+          </p>
+        {:else}
+          <label for="orec">Recebido agora (R197611</label>
+          <input id="orec" type="number" min="0" step="0.01" bind:value={form.recebido} />
+          <p class="field-dica">
+            Deixe em branco se a cliente for pagar na entrega.
+          </p>
+        {/if}
       </div>
     </div>
 

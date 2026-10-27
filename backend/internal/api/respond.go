@@ -63,7 +63,13 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) bool {
 
 // pathID extrai e valida o {id} da rota.
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathInt64(w, r, "id")
+}
+
+// pathInt64 extrai e valida um parâmetro numérico da rota pelo nome. As rotas
+// aninhadas têm dois, como o pagamento dentro do pedido.
+func pathInt64(w http.ResponseWriter, r *http.Request, nome string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(nome), 10, 64)
 	if err != nil || id <= 0 {
 		writeErr(w, http.StatusBadRequest, "Identificador inválido.")
 		return 0, false

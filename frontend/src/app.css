@@ -209,7 +209,10 @@ input:focus, select:focus, textarea:focus {
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
 
-label {
+label,
+/* Rótulo de um grupo que não é um campo só — a fileira de etapas, o resumo
+   do pagamento. Sem o for= de um <label>, que apontaria para o nada. */
+.pseudo-label {
   font-size: 12px;
   color: #596260;
   display: block;
@@ -265,7 +268,7 @@ label {
 }
 
 .empty { text-align: center; color: var(--muted); padding: 28px; }
-.actions { display: flex; gap: 5px; }
+.actions { display: flex; gap: 5px; flex-wrap: wrap; }
 .money-in { color: var(--green); font-weight: 700; }
 .money-out { color: var(--danger); font-weight: 700; }
 
@@ -937,4 +940,125 @@ label {
   .painel-hora { font-size: 24px; }
   .painel-quem strong { font-size: 19px; }
   .painel-fim { grid-column: 1 / -1; }
+}
+
+/* Etapas do pedido — do orçamento à entrega.
+
+   O status sempre existiu, mas morava dentro de um <select> no fim do
+   formulário do pedido. Resultado: todo pedido nascia "Orçamento" e ficava
+   assim para sempre, e a tela de ordens parecia só ter orçamentos.
+
+   Aqui as etapas são botões à vista, nos dois lugares onde ela precisa
+   delas: filtrando a lista de ordens, com a contagem de cada uma, e
+   escolhendo a etapa dentro do pedido. A mesma aparência nos dois para que
+   sejam reconhecidas como a mesma coisa. */
+.etapas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.etapa {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.etapa:hover { border-color: var(--teal2); }
+
+/* A etapa escolhida é a única preenchida: entre sete pílulas claras, o
+   contorno sozinho não se enxerga. */
+.etapa.ativa {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+
+.etapa-conta {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #eef2f1;
+  color: #4c5a58;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.etapa.ativa .etapa-conta {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+/* A caixinha de etapa dentro da linha da ordem. Fica com a cor do selo de
+   status para a lista continuar legível de longe, como era com o selo. */
+.etapa-select {
+  width: auto;
+  min-width: 128px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+.etapa-select.pendente { background: #fff2d8; color: #9a6a16; }
+.etapa-select.producao { background: #e7f1f4; color: #286174; }
+.etapa-select.pronto { background: #e2f2e8; color: #337051; }
+.etapa-select.entregue { background: #e8eee9; color: #41624e; }
+.etapa-select.cancelado { background: #f7e7e7; color: #a94b4b; }
+
+/* Pagamentos do pedido. O que falta receber é o número que ela procura na
+   lista, e por isso é o único em vermelho. */
+.devendo {
+  color: var(--danger);
+  font-weight: 700;
+}
+.recebido {
+  color: var(--green);
+  font-weight: 700;
+}
+.situacao-pagamento {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.pagamento-resumo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+
+/* O cabeçalho da tela de baixa: total, já pago e o que falta, lado a lado. */
+.pagamento-conta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.pagamento-conta > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: #fbfcfc;
+}
+.pagamento-conta span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pagamento-conta strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .pagamento-conta { grid-template-columns: 1fr; }
 }

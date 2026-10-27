@@ -31,10 +31,26 @@ type OrderItem struct {
 	PriceCents int64  `json:"priceCents"`
 }
 
+// Payment é um dinheiro que entrou num pedido. A cliente deixa a peça e paga
+// um sinal, volta na entrega e paga o resto: cada um desses recebimentos é um
+// Payment, e a soma deles é o que o pedido tem de pago.
+type Payment struct {
+	ID         int64  `json:"id"`
+	OrderID    int64  `json:"orderId"`
+	Date       string `json:"date"`
+	ValueCents int64  `json:"valueCents"`
+	Method     string `json:"method"`
+	Notes      string `json:"notes"`
+}
+
 // Order traz o pedido com a conta já fechada. Os percentuais são o que a
 // Maria combina com a cliente; os valores em centavos são derivados deles
 // pela view order_totals, e por isso só saem do banco — mandá-los numa
 // alteração não muda nada.
+//
+// Paid, PaidCents, BalanceCents e Payments também só saem do banco: quem paga
+// o pedido são as linhas de order_payments, criadas uma a uma. Mandar paid
+// numa alteração do pedido não dá baixa em nada.
 type Order struct {
 	ID              int64       `json:"id"`
 	Number          string      `json:"number"`
@@ -54,6 +70,9 @@ type Order struct {
 	DiscountCents   int64       `json:"discountCents"`
 	RushCents       int64       `json:"rushCents"`
 	TotalCents      int64       `json:"totalCents"`
+	Payments        []Payment   `json:"payments"`
+	PaidCents       int64       `json:"paidCents"`
+	BalanceCents    int64       `json:"balanceCents"`
 }
 
 type Transaction struct {
