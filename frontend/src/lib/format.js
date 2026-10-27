@@ -156,6 +156,26 @@ export const PAYMENT_METHODS = [
   'Não informado', 'Pix', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito',
 ]
 
+/* As formas que entram numa baixa. "Não informado" fica de fora: quando o
+   dinheiro entra de verdade, ela sabe como entrou. */
+export const FORMAS_DE_RECEBIMENTO = PAYMENT_METHODS.filter((p) => p !== 'Não informado')
+
+/**
+ * Quanto falta receber de um pedido, nunca negativo.
+ *
+ * O pedido pago a mais existe — a cliente arredondou para cima — e o saldo
+ * negativo é guardado como está. Mas na hora de cobrar, o que falta é zero,
+ * não um valor "a menos".
+ */
+export function faltaReceber(order) {
+  return Math.max(0, Number(order?.balanceCents) || 0)
+}
+
+/** Pedido cancelado não deve nada: ninguém cobra o que não vai ser feito. */
+export function temSaldoAberto(order) {
+  return order?.status !== 'Cancelado' && faltaReceber(order) > 0
+}
+
 /**
  * Junta os serviços do pedido pela peça de roupa, mantendo a ordem em que
  * cada peça aparece: [{ peca, itens }]. Os serviços sem peça informada ficam

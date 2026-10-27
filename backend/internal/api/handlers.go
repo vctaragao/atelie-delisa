@@ -301,6 +301,116 @@ func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 	return true
 }
 
+// ---------- etapa e pagamentos do pedido ----------
+
+// statusBody é o corpo de PUT /api/orders/{id}/status. Só a etapa: mover um
+// pedido para produção pela lista de ordens não deve mexer em mais nada, e
+// mandar o pedido inteiro de volta só para isso reescreveria os itens à toa.
+type statusBody struct {
+	Status string `json:"status"`
+}
+
+func (s *Server) setOrderStatus(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in statusBody
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	in.Status = strings.TrimSpace(in.Status)
+	if !store.ValidStatus(in.Status) {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"Status inválido. Use um destes: "+strings.Join(store.OrderStatuses, ", ")+".")
+		return
+	}
+	out, err := s.st.SetOrderStatus(id, in.Status)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// createPayment dá baixa de um valor recebido. Devolve o pedido inteiro, e
+// não o pagamento: quem está na tela precisa ver na hora quanto ainda falta.
+func (s *Server) createPayment(w http.ResponseWriter, r *http.Request) {
+	orderID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in store.Payment
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+
+	// Quem manda no pedido é a rota, não o corpo.
+	in.OrderID = orderID
+	in.Date = strings.TrimSpace(in.Date)
+	in.Method = strings.TrimSpace(in.Method)
+	in.Notes = strings.TrimSpace(in.Notes)
+
+	if in.Date == "" {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"Informe a data em que o pagamento foi recebido.")
+		return
+	}
+	if _, err := time.Parse("2006-01-02", in.Date); err != nil {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"A data do pagamento deve estar no formato AAAA-MM-DD.")
+		return
+	}
+	// Zero não é baixa nenhuma. Valor negativo seria um estorno, e o estorno
+	// aqui é excluir o pagamento lançado errado — some do histórico em vez de
+	// virar uma linha negativa que ninguém entende depois.
+	if in.ValueCents <= 0 {
+		writeErr(w, http.StatusUnprocessableEntity,
+			"O valor recebido precisa ser maior que zero.")
+		return
+	}
+	if in.Method == "" {
+		in.Method = "Não informado"
+	}
+
+	out, err := s.st.CreatePayment(in)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (s *Server) deletePayment(w http.ResponseWriter, r *http.Request) {
+	orderID, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	paymentID, ok := pathInt64(w, r, "paymentId")
+	if !ok {
+		return
+	}
+
+	// O pagamento tem de ser mesmo deste pedido: sem esta conferência, um
+	// endereço montado errado apagaria a baixa de outra cliente.
+	pg, err := s.st.GetPayment(paymentID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	if pg.OrderID != orderID {
+		writeErr(w, http.StatusNotFound, "Este pagamento não é deste pedido.")
+		return
+	}
+
+	out, err := s.st.DeletePayment(paymentID)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // ---------- mensagens do WhatsApp ----------
 
 func (s *Server) listMessages(w http.ResponseWriter, r *http.Request) {

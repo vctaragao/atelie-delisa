@@ -95,7 +95,7 @@ export function preencherMensagem(texto, order) {
     servicos: listaDePecas(order),
     pecas: String(orderQty(order)),
     total: money(order.totalCents),
-    pagamento: order.paid ? 'já pago' : 'a pagar na retirada',
+    pagamento: situacaoDoPagamento(order),
     entrega: entregaCombinada(order) || 'a combinar',
     situacao: order.status ?? '',
   }
@@ -103,6 +103,19 @@ export function preencherMensagem(texto, order) {
   return String(texto ?? '').replace(/\{([a-z_]+)\}/g, (inteiro, chave) =>
     chave in valores ? valores[chave] : inteiro,
   )
+}
+
+/**
+ * O que escrever no lugar de {pagamento}: a cliente que já pagou tudo não
+ * pode receber um aviso pedindo dinheiro, e a que deixou um sinal precisa
+ * saber quanto ainda falta.
+ */
+function situacaoDoPagamento(order) {
+  const falta = Math.max(0, Number(order.balanceCents) || 0)
+  const pago = Number(order.paidCents) || 0
+  if (falta === 0) return 'já pago'
+  if (pago > 0) return `faltam ${money(falta)}`
+  return 'a pagar na retirada'
 }
 
 /** A mensagem que já vem escolhida para a situação atual do pedido. */
@@ -118,6 +131,8 @@ export const PEDIDO_DE_EXEMPLO = {
   clientName: 'Ana Maria Souza',
   status: 'Pronto',
   paid: false,
+  paidCents: 0,
+  balanceCents: 11000,
   due: '2026-03-15',
   dueTime: '14:30',
   totalCents: 11000,

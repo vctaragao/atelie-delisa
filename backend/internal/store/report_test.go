@@ -19,19 +19,29 @@ func TestRelatorioFechaOPeriodo(t *testing.T) {
 		t.Fatalf("criando cliente: %v", err)
 	}
 
+	// pago aqui significa quitado: o pedido recebe uma baixa do valor cheio,
+	// na data de entrada. É o que a Maria faz quando a cliente paga tudo de
+	// uma vez.
 	criar := func(cliente int64, date, status string, pago bool, desconto, urgencia int64, itens ...OrderItem) {
 		t.Helper()
-		_, err := s.CreateOrder(Order{
+		pedido, err := s.CreateOrder(Order{
 			ClientID:        cliente,
 			Date:            date,
 			Status:          status,
-			Paid:            pago,
 			DiscountPercent: desconto,
 			RushPercent:     urgencia,
 			Items:           itens,
 		})
 		if err != nil {
 			t.Fatalf("criando pedido de %s: %v", date, err)
+		}
+		if !pago {
+			return
+		}
+		if _, err := s.CreatePayment(Payment{
+			OrderID: pedido.ID, Date: date, ValueCents: pedido.TotalCents, Method: "Pix",
+		}); err != nil {
+			t.Fatalf("dando baixa no pedido de %s: %v", date, err)
 		}
 	}
 

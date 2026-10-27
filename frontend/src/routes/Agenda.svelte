@@ -17,6 +17,7 @@
     groupItemsByPiece,
     listItems,
     porHora,
+    faltaReceber,
     DIAS_DA_SEMANA,
   } from '../lib/format.js'
 
@@ -285,9 +286,17 @@
               <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
               <td>
                 {money(o.totalCents)}
-                {#if o.paid}
-                  <span class="badge pago" style="margin-left:6px">pago</span>
-                {/if}
+                <!-- Quanto receber na entrega. É neste dia que a cliente vem
+                     buscar a peça, e é a última hora de cobrar o que falta. -->
+                <span class="situacao-pagamento">
+                  {#if faltaReceber(o) === 0}
+                    <span class="badge pago">pago</span>
+                  {:else if o.paidCents > 0}
+                    <span class="devendo">falta {money(faltaReceber(o))}</span>
+                  {:else}
+                    <span class="devendo">a receber</span>
+                  {/if}
+                </span>
               </td>
               <td>
                 <div class="actions">

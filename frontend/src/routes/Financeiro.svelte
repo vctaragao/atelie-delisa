@@ -11,6 +11,44 @@
 
   const s = $derived(data.summary)
 
+  /**
+   * O movimento do caixa: os lançamentos escritos à mão e as baixas dos
+   * pedidos, na mesma lista, do mais recente para o mais antigo.
+   *
+   * As baixas aparecem aqui porque elas são dinheiro que entrou de verdade e
+   * já contam no "total recebido" — sem elas na lista, a soma lá em cima não
+   * bateria com nada do que se vê embaixo. Elas não se editam daqui: quem
+   * manda numa baixa é o pedido dela.
+   */
+  const lancamentos = $derived.by(() => {
+    const dosPedidos = data.orders.flatMap((o) =>
+      (o.payments || []).map((p) => ({
+        chave: `pagamento-${p.id}`,
+        date: p.date,
+        descricao: `Pedido #${o.number} — ${o.clientName}`,
+        detalhe: p.notes,
+        type: 'entrada',
+        valueCents: p.valueCents,
+        payment: p.method,
+        doPedido: true,
+      })),
+    )
+    const manuais = data.transactions.map((t) => ({
+      chave: `lancamento-${t.id}`,
+      date: t.date,
+      descricao: t.description,
+      detalhe: '',
+      type: t.type,
+      valueCents: t.valueCents,
+      payment: t.payment,
+      doPedido: false,
+      original: t,
+    }))
+    return [...dosPedidos, ...manuais].sort((a, b) =>
+      a.date === b.date ? 0 : a.date < b.date ? 1 : -1,
+    )
+  })
+
   function blank() {
     return { date: today(), type: 'entrada', description: '', value: '', payment: 'Pix' }
   }
@@ -81,23 +119,35 @@
         <tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Forma</th><th>Valor</th><th></th></tr>
       </thead>
       <tbody>
-        {#each data.transactions as t (t.id)}
+        {#each lancamentos as l (l.chave)}
           <tr>
-            <td>{fmtDate(t.date)}</td>
-            <td>{t.description}</td>
+            <td>{fmtDate(l.date)}</td>
+            <td style="white-space:normal">
+              {l.descricao}
+              {#if l.detalhe}<br /><span class="agenda-resumo">{l.detalhe}</span>{/if}
+            </td>
             <td>
-              <span class={t.type === 'entrada' ? 'money-in' : 'money-out'}>
-                {t.type === 'entrada' ? 'Entrada' : 'Saída'}
+              <span class={l.type === 'entrada' ? 'money-in' : 'money-out'}>
+                {l.type === 'entrada' ? 'Entrada' : 'Saída'}
               </span>
             </td>
-            <td>{t.payment || '—'}</td>
-            <td>{money(t.valueCents)}</td>
-            <td><button class="btn danger small" onclick={() => remove(t)}>Excluir</button></td>
+            <td>{l.payment || '—'}</td>
+            <td>{money(l.valueCents)}</td>
+            <td>
+              {#if l.doPedido}
+                <span class="agenda-resumo">baixa do pedido</span>
+              {:else}
+                <button class="btn danger small" onclick={() => remove(l.original)}>
+                  Excluir
+                </button>
+              {/if}
+            </td>
           </tr>
         {:else}
           <tr>
             <td colspan="6" class="empty">
-              Nenhum lançamento manual. Pagamentos dos pedidos aparecem nos totais.
+              Nada lançado ainda. Os pagamentos que você der baixa nos pedidos
+              aparecem aqui sozinhos.
             </td>
           </tr>
         {/each}

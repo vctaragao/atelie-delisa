@@ -14,16 +14,23 @@ func (s *Store) Report(from, to string) (Report, error) {
 
 	// Os valores vêm da view order_totals, que já aplica desconto e urgência.
 	// Cancelado fica fora: o pedido existiu, mas não virou dinheiro nenhum.
+	//
+	// "Já pago" e "a receber" são do pedido do período, não do dinheiro que
+	// entrou no período: um pedido de março pago em abril continua contando
+	// em março, que é onde o trabalho foi feito. O pedido pago pela metade
+	// entra dos dois lados, cada um com a sua parte.
 	err := s.db.QueryRow(`
 		SELECT COUNT(*),
 		       COUNT(DISTINCT o.client_id),
 		       COALESCE(SUM(t.total_cents), 0),
 		       COALESCE(SUM(t.discount_cents), 0),
 		       COALESCE(SUM(t.rush_cents), 0),
-		       COALESCE(SUM(CASE WHEN o.paid = 1 THEN t.total_cents ELSE 0 END), 0),
-		       COALESCE(SUM(CASE WHEN o.paid = 0 THEN t.total_cents ELSE 0 END), 0)
+		       COALESCE(SUM(COALESCE(pg.paid_cents, 0)), 0),
+		       COALESCE(SUM(MAX(t.total_cents - COALESCE(pg.paid_cents, 0), 0)), 0)
 		FROM orders o
 		JOIN order_totals t ON t.order_id = o.id
+		LEFT JOIN (SELECT order_id, SUM(value_cents) AS paid_cents
+		             FROM order_payments GROUP BY order_id) pg ON pg.order_id = o.id
 		WHERE o.date BETWEEN ? AND ? AND o.status <> 'Cancelado'`,
 		from, to,
 	).Scan(
