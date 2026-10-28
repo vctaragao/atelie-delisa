@@ -403,15 +403,13 @@ label,
 
   /* O comprovante é renderizado dentro de .main, junto com a tela de ordens.
      Por isso não se pode esconder .app nem .main com display:none — isso
-     levaria o comprovante embora e a folha sairia em branco. Esconde-se a
-     moldura (barra lateral, cabeçalho, avisos) e o conteúdo da tela
-     (.toolbar e .card, os invólucros que toda tela usa). */
+     levaria o comprovante embora e a folha sairia em branco. Em vez de listar
+     os invólucros a esconder — lista que esquece todo bloco novo que a tela
+     ganhar depois, e foi assim que a barra de etapas começou a sair no papel —,
+     esconde-se tudo o que estiver ao lado do comprovante dentro da .main. */
   .faixa-teste,
   .sidebar,
-  .topbar,
-  .notice,
-  .toolbar,
-  .card,
+  .main > *:not(.modal-bg),
   .modal-head,
   .modal-foot { display: none !important; }
 
