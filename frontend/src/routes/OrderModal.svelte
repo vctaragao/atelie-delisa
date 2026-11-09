@@ -2,6 +2,7 @@
   import Modal from '../lib/Modal.svelte'
   import { api } from '../lib/api.js'
   import { data, refresh } from '../lib/data.svelte.js'
+  import { cupom } from '../lib/cupom.js'
   import {
     money,
     toCents,
@@ -183,6 +184,74 @@
   const prazo = $derived(prazoEmHoras(form.date, form.due, form.dueTime))
   const urgente = $derived(prazo !== null && prazo < URGENCIA_HORAS)
 
+  /* Conferência da notinha com o pedido ainda aberto no formulário. A
+     impressora fica no balcão e a cliente leva o papel na hora, então a nota
+     precisa poder sair antes de salvar — e é também como ver se ficou torta
+     antes de gastar bobina. */
+  let conferindo = $state(false)
+
+  const clienteDoPedido = $derived(data.clients.find((c) => c.id === Number(form.clientId)))
+
+  // O que a cliente já deixou: no pedido novo é o "Recebido agora" do balcão;
+  // no que já existe são as baixas lançadas pela tela de pagamentos.
+  const jaPago = $derived(editing ? Number(order.paidCents) || 0 : toCents(form.recebido))
+
+  /* O pedido como ele ficaria se fosse salvo agora, no formato que o cupom
+     espera. Os valores saem da conta do formulário, e não do pedido gravado:
+     ela pode ter mexido nos serviços e ainda não ter salvado. */
+  const pedidoDaNotinha = $derived({
+    number: editing ? order.number : null,
+    clientId: Number(form.clientId),
+    clientName: clienteDoPedido?.name || '',
+    date: form.date,
+    due: form.due,
+    dueTime: form.due ? form.dueTime : '',
+    status: form.status,
+    payment: form.payment,
+    notes: form.notes,
+    items: servicosDoFormulario().filter((i) => i.qty > 0),
+    discountPercent: Number(form.discountPercent) || 0,
+    rushPercent: Number(form.rushPercent) || 0,
+    ...conta,
+    paidCents: jaPago,
+    balanceCents: conta.totalCents - jaPago,
+  })
+
+  // O que aparece na tela é o mesmo texto que sai no papel, caractere por
+  // caractere.
+  const textoDaNotinha = $derived(cupom(pedidoDaNotinha, clienteDoPedido))
+
+  const tituloDoModal = $derived(
+    conferindo
+      ? 'Notinha do pedido'
+      : editing
+        ? `Editar pedido #${order.number}`
+        : 'Novo pedido',
+  )
+
+  function conferirNotinha() {
+    formError = problemaNoFormulario()
+    if (formError) return
+    conferindo = true
+  }
+
+  function imprimir() {
+    window.print()
+  }
+
+  /* O que impede o pedido de seguir, seja para salvar, seja para imprimir:
+     notinha com a cliente errada, ou sem serviço nenhum, não serve para nada.
+     Devolve a mensagem para mostrar, ou null quando está tudo certo. */
+  function problemaNoFormulario() {
+    // Cadastro aberto e não salvo: avisa em vez de engolir o que ela digitou.
+    if (novoCliente) return 'Salve ou cancele o cadastro da cliente antes de continuar.'
+    if (!Number(form.clientId)) return 'Escolha a cliente do pedido, ou cadastre uma nova.'
+    if (servicosDoFormulario().filter((i) => i.qty > 0).length === 0) {
+      return 'Adicione pelo menos um serviço.'
+    }
+    return null
+  }
+
   function addPeca() {
     form.pecas.push({ nome: '', servicos: [servicoVazio()] })
   }
@@ -223,25 +292,11 @@
 
   async function save(event) {
     event.preventDefault()
-    formError = null
 
-    // Cadastro aberto e não salvo: avisa em vez de engolir o que ela digitou.
-    if (novoCliente) {
-      formError = 'Salve ou cancele o cadastro da cliente antes de salvar o pedido.'
-      return
-    }
-
-    if (!Number(form.clientId)) {
-      formError = 'Escolha a cliente do pedido, ou cadastre uma nova.'
-      return
-    }
+    formError = problemaNoFormulario()
+    if (formError) return
 
     const items = servicosDoFormulario().filter((i) => i.qty > 0)
-
-    if (items.length === 0) {
-      formError = 'Adicione pelo menos um serviço.'
-      return
-    }
 
     const payload = {
       clientId: Number(form.clientId),
@@ -301,8 +356,22 @@
   }
 </script>
 
-<Modal title={editing ? `Editar pedido #${order.number}` : 'Novo pedido'} {onclose}>
-  <form onsubmit={save}>
+<Modal title={tituloDoModal} {onclose}>
+  {#if conferindo}
+    <!-- A notinha de um pedido que ainda não foi salvo: ela confere no papel,
+         ou na tela, antes de gravar. O formulário continua aqui embaixo,
+         apenas escondido, para ela voltar e achar tudo como deixou. -->
+    <pre class="comprovante">{textoDaNotinha}</pre>
+
+    <div class="modal-foot">
+      <button type="button" class="btn light" onclick={() => (conferindo = false)}>
+        Voltar ao pedido
+      </button>
+      <button type="button" class="btn" onclick={imprimir}>Imprimir</button>
+    </div>
+  {/if}
+
+  <form onsubmit={save} hidden={conferindo}>
     <div class="grid2">
       <div class="form-group">
         <label for="oc">Cliente *</label>
@@ -612,7 +681,7 @@
             valor recebido fica com a sua data e a sua forma.
           </p>
         {:else}
-          <label for="orec">Recebido agora (R197611</label>
+          <label for="orec">Recebido agora (R$)</label>
           <input id="orec" type="number" min="0" step="0.01" bind:value={form.recebido} />
           <p class="field-dica">
             Deixe em branco se a cliente for pagar na entrega.
@@ -662,6 +731,9 @@
 
     <div class="modal-foot">
       <button type="button" class="btn light" onclick={onclose}>Cancelar</button>
+      <button type="button" class="btn light" onclick={conferirNotinha}>
+        Conferir a notinha
+      </button>
       <button class="btn" disabled={saving}>{saving ? 'Salvando…' : 'Salvar pedido'}</button>
     </div>
   </form>
