@@ -152,6 +152,21 @@ export const ORDER_STATUSES = [
   'Orçamento', 'Aguardando', 'Em produção', 'Pronto', 'Entregue', 'Cancelado',
 ]
 
+/* Etapas que não cobram atraso. "Pronto" entra aqui junto de entregue e
+   cancelado: a peça está feita e o que falta é a cliente passar para buscar,
+   o que não é trabalho atrasado do ateliê. */
+const SEM_ATRASO = ['Pronto', 'Entregue', 'Cancelado']
+
+/**
+ * O pedido passou do dia combinado e ainda depende do ateliê.
+ *
+ * Mora aqui porque a tela da agenda e o quadro da segunda tela precisam
+ * contar a mesma coisa como atrasada.
+ */
+export function atrasado(order, hoje = today()) {
+  return Boolean(order?.due) && order.due < hoje && !SEM_ATRASO.includes(order.status)
+}
+
 export const PAYMENT_METHODS = [
   'Não informado', 'Pix', 'Dinheiro', 'Cartão de débito', 'Cartão de crédito',
 ]
