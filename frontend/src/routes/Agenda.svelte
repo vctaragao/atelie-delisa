@@ -1,7 +1,8 @@
 <script>
   import OrderModal from './OrderModal.svelte'
   import AvisarWhatsapp from '../lib/AvisarWhatsapp.svelte'
-  import { data } from '../lib/data.svelte.js'
+  import { api } from '../lib/api.js'
+  import { data, mutate } from '../lib/data.svelte.js'
   import {
     money,
     fmtDate,
@@ -18,7 +19,9 @@
     listItems,
     porHora,
     faltaReceber,
+    atrasado,
     DIAS_DA_SEMANA,
+    ORDER_STATUSES,
   } from '../lib/format.js'
 
   let { goto } = $props()
@@ -65,7 +68,7 @@
   const doDia = (iso) => porDia.get(iso) || []
 
   const atrasados = $derived(
-    data.orders.filter((o) => o.due && o.due < hoje && emAberto(o)).sort((a, b) =>
+    data.orders.filter((o) => atrasado(o, hoje)).sort((a, b) =>
       a.due === b.due ? porHora(a, b) : a.due < b.due ? -1 : 1,
     ),
   )
@@ -109,6 +112,20 @@
       'popup=yes,width=1150,height=900',
     )
     janela?.focus()
+  }
+
+  // A etapa muda nas listas da agenda sem abrir o pedido: é aqui que ela
+  // acompanha o dia, e marcar a peça como pronta na mesma tela evita o
+  // passeio até a lista de ordens.
+  async function mudarEtapa(order, caixinha) {
+    const status = caixinha.value
+    if (status === order.status) return
+    // A caixinha já mostra a etapa nova antes do servidor responder. Se a
+    // gravação falhar, o pedido continua na etapa antiga: a caixinha volta
+    // para ela, para a tela não afirmar uma coisa que não foi gravada.
+    if (!(await mutate(() => api.setOrderStatus(order.id, status)))) {
+      caixinha.value = order.status
+    }
   }
 </script>
 
@@ -168,7 +185,18 @@
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>
-              <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
+              <td>
+                <select
+                  class="etapa-select {statusClass(o.status)}"
+                  value={o.status}
+                  onchange={(e) => mudarEtapa(o, e.currentTarget)}
+                  aria-label="Etapa do pedido {o.number}"
+                >
+                  {#each ORDER_STATUSES as s (s)}
+                    <option value={s}>{s}</option>
+                  {/each}
+                </select>
+              </td>
               <td>{money(o.totalCents)}</td>
               <td>
                 <div class="actions">
@@ -283,7 +311,18 @@
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>
-              <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
+              <td>
+                <select
+                  class="etapa-select {statusClass(o.status)}"
+                  value={o.status}
+                  onchange={(e) => mudarEtapa(o, e.currentTarget)}
+                  aria-label="Etapa do pedido {o.number}"
+                >
+                  {#each ORDER_STATUSES as s (s)}
+                    <option value={s}>{s}</option>
+                  {/each}
+                </select>
+              </td>
               <td>
                 {money(o.totalCents)}
                 <!-- Quanto receber na entrega. É neste dia que a cliente vem
@@ -348,7 +387,18 @@
                 {/each}
               </td>
               <td><b>{orderQty(o)}</b></td>
-              <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
+              <td>
+                <select
+                  class="etapa-select {statusClass(o.status)}"
+                  value={o.status}
+                  onchange={(e) => mudarEtapa(o, e.currentTarget)}
+                  aria-label="Etapa do pedido {o.number}"
+                >
+                  {#each ORDER_STATUSES as s (s)}
+                    <option value={s}>{s}</option>
+                  {/each}
+                </select>
+              </td>
               <td>{money(o.totalCents)}</td>
               <td>
                 <div class="actions">

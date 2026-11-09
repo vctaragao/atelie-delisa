@@ -122,7 +122,12 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
   linhas.push(...centro('ATELIÊ DELISA'))
   linhas.push(...centro('Comprovante de pedido'))
   linhas.push(SEPARADOR)
-  linhas.push(...centro(`PEDIDO #${pedido.number}`))
+  /* O número do pedido é dado pelo banco na hora de gravar. A notinha também
+     pode ser impressa com o pedido ainda aberto no formulário, quando número
+     nenhum existe: o papel diz isso em vez de mostrar um número inventado. */
+  linhas.push(
+    ...centro(pedido.number ? `PEDIDO #${pedido.number}` : 'PEDIDO AINDA SEM NUMERO'),
+  )
   linhas.push(SEPARADOR)
 
   linhas.push(...par('Cliente', pedido.clientName))

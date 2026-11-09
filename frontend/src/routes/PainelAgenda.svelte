@@ -9,6 +9,7 @@
     groupItemsByPiece,
     listItems,
     porHora,
+    atrasado,
   } from '../lib/format.js'
 
   // A cópia de teste e o sistema de verdade rodam no mesmo navegador, e o
@@ -59,7 +60,7 @@
   )
   const atrasados = $derived(
     data.orders
-      .filter((o) => o.due && o.due < hoje && emAberto(o))
+      .filter((o) => atrasado(o, hoje))
       .sort((a, b) => (a.due === b.due ? porHora(a, b) : a.due < b.due ? -1 : 1)),
   )
 
