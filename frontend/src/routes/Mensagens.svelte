@@ -73,7 +73,7 @@
 
   async function restaurar() {
     const msg =
-      'Restaurar as três mensagens padrão?\n\n' +
+      'Restaurar as mensagens padrão?\n\n' +
       'As mensagens de agora serão apagadas, inclusive as que você escreveu.'
     if (!confirm(msg)) return
     await mutate(() => api.restoreMessages())
