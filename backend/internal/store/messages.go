@@ -13,11 +13,29 @@ import (
 // esses apelidos: para ele é texto, e é isso que permite ela inventar uma
 // mensagem nova sem precisar de alteração no sistema.
 
-// DefaultMessages são os textos que o ateliê começa usando. Ficam aqui, e não
-// na migração, para serem a única fonte: o botão "restaurar" da tela reinsere
-// exatamente estes.
+// DefaultMessages são os textos que o ateliê começa usando. Esta é a fonte
+// viva deles: é exatamente esta lista que o botão "restaurar" da tela
+// reinsere.
+//
+// Uma mensagem acrescentada aqui depois do primeiro start não chega sozinha
+// a um banco que já tem mensagens — o seed abaixo só roda na tabela vazia.
+// Para ela chegar à produção, vai também numa migração nova, que copia o
+// texto e o insere no banco que já existe (ver 0007_mensagem_de_orcamento.sql).
 func DefaultMessages() []MessageTemplate {
 	return []MessageTemplate{
+		{
+			// Primeira da lista porque "Orçamento" é a primeira etapa do
+			// pedido: é a mensagem que abre a conversa com a cliente.
+			Name:          "Orçamento para aprovação",
+			SuggestStatus: "Orçamento",
+			Body: "Oi, {cliente}! Aqui é do Ateliê Delisa.\n\n" +
+				"Fiz o orçamento do seu pedido #{pedido}:\n\n" +
+				"{orcamento}\n\n" +
+				"Total: {total}.\n" +
+				"Prazo de entrega: {entrega}.\n\n" +
+				"Se estiver tudo certo, me confirme por aqui que eu já começo. " +
+				"Se quiser mudar alguma coisa, a gente ajeita.",
+		},
 		{
 			Name:          "Serviço pronto para retirada",
 			SuggestStatus: "Pronto",

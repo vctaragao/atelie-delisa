@@ -59,6 +59,41 @@ function listaDePecas(order) {
     .join(', ')
 }
 
+/**
+ * O orçamento item por item, uma linha para cada serviço com o seu preço:
+ *
+ *     Calça jeans
+ *     - 1x Bainha: R$ 25,00
+ *     - 1x Ajuste de cintura: R$ 35,00
+ *     Vestido de festa
+ *     - 1x Troca de zíper: R$ 35,00
+ *     Desconto (10%): -R$ 9,50
+ *     Urgência (20%): +R$ 19,00
+ *
+ * É o que falta para a cliente aprovar: ninguém aprova um valor fechado sem
+ * saber de onde ele vem. O desconto e a urgência só entram quando existem, e
+ * o total fica de fora, no {total}, para a frase do fechamento ser escrita
+ * com as palavras dela.
+ */
+function listaDeOrcamento(order) {
+  const linhas = []
+
+  for (const grupo of groupItemsByPiece(order.items)) {
+    if (grupo.peca) linhas.push(grupo.peca)
+    for (const item of grupo.itens) {
+      const qtd = Number(item.qty) || 0
+      linhas.push(`- ${qtd}x ${item.name}: ${money(qtd * (Number(item.priceCents) || 0))}`)
+    }
+  }
+
+  const desconto = Number(order.discountCents) || 0
+  const urgencia = Number(order.rushCents) || 0
+  if (desconto > 0) linhas.push(`Desconto (${order.discountPercent}%): -${money(desconto)}`)
+  if (urgencia > 0) linhas.push(`Urgência (${order.rushPercent}%): +${money(urgencia)}`)
+
+  return linhas.join('\n')
+}
+
 function entregaCombinada(order) {
   if (!order.due) return ''
   const dia = fmtDate(order.due)
@@ -73,6 +108,10 @@ export const APELIDOS = [
   { chave: '{cliente_completo}', descricao: 'o nome completo da cliente' },
   { chave: '{pedido}', descricao: 'o número do pedido' },
   { chave: '{servicos}', descricao: 'as peças e os serviços do pedido' },
+  {
+    chave: '{orcamento}',
+    descricao: 'o orçamento item por item, com o preço de cada serviço',
+  },
   { chave: '{pecas}', descricao: 'quantas peças o pedido tem' },
   { chave: '{total}', descricao: 'o valor total' },
   { chave: '{pagamento}', descricao: '"já pago" ou "a pagar na retirada"' },
@@ -93,6 +132,7 @@ export function preencherMensagem(texto, order) {
     cliente_completo: String(order.clientName ?? '').trim(),
     pedido: order.number ?? '',
     servicos: listaDePecas(order),
+    orcamento: listaDeOrcamento(order),
     pecas: String(orderQty(order)),
     total: money(order.totalCents),
     pagamento: situacaoDoPagamento(order),
@@ -132,10 +172,18 @@ export const PEDIDO_DE_EXEMPLO = {
   status: 'Pronto',
   paid: false,
   paidCents: 0,
-  balanceCents: 11000,
+  balanceCents: 10450,
   due: '2026-03-15',
   dueTime: '14:30',
-  totalCents: 11000,
+  // A conta do exemplo fecha: 95,00 de serviços, menos 10% de desconto, mais
+  // 20% de urgência. É o que faz a prévia do {orcamento} mostrar as duas
+  // linhas e bater com o {total}.
+  itemsCents: 9500,
+  discountPercent: 10,
+  discountCents: 950,
+  rushPercent: 20,
+  rushCents: 1900,
+  totalCents: 10450,
   items: [
     { id: 1, name: 'Bainha', piece: 'Calça jeans', qty: 1, priceCents: 2500 },
     { id: 2, name: 'Ajuste de cintura', piece: 'Calça jeans', qty: 1, priceCents: 3500 },
