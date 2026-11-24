@@ -292,7 +292,9 @@ label,
   display: grid;
   grid-template-columns: 1fr 110px 120px 34px;
   gap: 7px;
-  align-items: center;
+  /* start, e não center: a busca de serviço cresce para baixo quando a lista
+     de achados abre, e os outros campos da linha precisam ficar onde estão. */
+  align-items: start;
 }
 
 .summary {
@@ -661,6 +663,61 @@ label,
   gap: 7px;
 }
 
+/* Busca de serviço da tabela de preços, na primeira coluna da linha do
+   serviço. A lista de achados abre embaixo do campo, dentro da coluna e no
+   fluxo da página: o modal do pedido tem rolagem própria, e uma lista
+   flutuante seria cortada na borda de baixo. Por isso o `align-items: start`
+   da .service-row — enquanto a lista está aberta a linha cresce, e a
+   quantidade e o preço continuam alinhados com o campo, em vez de descerem
+   para o meio. */
+.busca-servico { min-width: 0; }
+.achados {
+  margin-top: 5px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  overflow-y: auto;
+  /* Pouco mais de meia dúzia de achados à vista, para a lista não empurrar o
+     resto do formulário para fora da tela. */
+  max-height: 232px;
+}
+.achado {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #eef1f0;
+  background: none;
+  padding: 8px 10px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.achado:last-child { border-bottom: 0; }
+/* O destaque acompanha o teclado e o mouse na mesma classe: assim a seta e o
+   ponteiro nunca mostram dois itens marcados ao mesmo tempo. */
+.achado.destacado { background: #eef4f3; }
+.achado-nome { overflow-wrap: anywhere; }
+.achado-preco {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+/* As saídas para o que não está na tabela — cadastrar o serviço na tabela ou
+   cobrar só neste pedido — fecham a lista, em tom mais apagado para não
+   competir com os achados. Ficam no fim e rolam com o resto: quando ela
+   precisa delas a busca não achou nada, e a lista curta já as mostra. */
+.achado-saida {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  background: #fbfcfc;
+}
+.achado-saida + .achado-saida { border-top-color: #eef1f0; }
+
 /* A peça aparece junto do serviço nas listagens, em tom mais apagado. */
 .item-peca { color: var(--muted); }
 
@@ -718,12 +775,14 @@ label,
 }
 .apelido:hover { background: #eef3f1; border-color: #76a9a9; }
 
-/* Cadastro da cliente dentro do modal do pedido. */
+/* Cadastro rápido dentro do modal do pedido: a ficha da cliente nova e o
+   serviço novo na tabela de preços usam a mesma moldura, porque são a mesma
+   ideia — cadastrar sem sair do pedido pela metade. */
 .cliente-campo { display: flex; gap: 7px; align-items: center; }
 .cliente-campo select { flex: 1; min-width: 0; }
 .cliente-campo .btn { white-space: nowrap; }
 
-.novo-cliente {
+.cadastro-embutido {
   border: 1px solid var(--border);
   border-left: 4px solid var(--gold);
   border-radius: 10px;
@@ -731,7 +790,7 @@ label,
   background: #fbfcfc;
   margin-bottom: 16px;
 }
-.novo-cliente-titulo {
+.cadastro-embutido-titulo {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -740,8 +799,8 @@ label,
 }
 /* O cadastro é um trecho do formulário do pedido, não um formulário à parte:
    os campos ficam mais juntos para não competir com o pedido em volta. */
-.novo-cliente .form-group { margin-bottom: 10px; }
-.novo-cliente-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.cadastro-embutido .form-group { margin-bottom: 10px; }
+.cadastro-embutido-foot { display: flex; justify-content: flex-end; gap: 8px; }
 
 /* Quadro da agenda — a janela que fica aberta numa segunda tela.
 
