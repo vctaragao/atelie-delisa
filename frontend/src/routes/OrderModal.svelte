@@ -1,5 +1,6 @@
 <script>
   import Modal from '../lib/Modal.svelte'
+  import EscolherServico from '../lib/EscolherServico.svelte'
   import { api } from '../lib/api.js'
   import { data, refresh } from '../lib/data.svelte.js'
   import { cupom } from '../lib/cupom.js'
@@ -112,6 +113,17 @@
     return [...usadas].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   })
 
+  /* As categorias que já existem na tabela de preços, para o cadastro de
+     serviço reaproveitar o nome em vez de criar "Conserto", "Consertos" e
+     "conserto" como três categorias diferentes. */
+  const categoriasDeServico = $derived.by(() => {
+    const usadas = new Set()
+    for (const s of data.services) {
+      if (s.category) usadas.add(s.category)
+    }
+    return [...usadas].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  })
+
   let saving = $state(false)
   let formError = $state(null)
 
@@ -165,6 +177,64 @@
     if (event.key !== 'Enter') return
     event.preventDefault()
     salvarNovoCliente()
+  }
+
+  /* Cadastro de serviço na tabela de preços sem sair do pedido, pela mesma
+     razão do cadastro da cliente: o serviço que ela ainda não tinha na tabela
+     aparece com a peça na mão, e ir até a tela de Serviços e voltar custaria
+     o pedido meio preenchido.
+
+     `alvo` é a própria linha de serviço do pedido que pediu o cadastro — é
+     nela que o serviço recém-criado entra, que foi o motivo de cadastrar
+     aqui. Guardar o objeto e compará-lo por identidade funciona porque o
+     estado do Svelte devolve sempre o mesmo objeto para a mesma linha, e
+     guardá-lo aqui dentro não o troca por outro. É o que `removeServico` já
+     faz com a peça, logo acima.
+     novoServico: null = fechado. */
+  let novoServico = $state(null)
+  let salvandoServico = $state(false)
+  let erroServico = $state(null)
+  let campoNomeServico = $state(null)
+
+  function abrirNovoServico(item, nome) {
+    erroServico = null
+    novoServico = { alvo: item, name: nome || '', price: '', category: '', time: '' }
+    requestAnimationFrame(() => campoNomeServico?.focus())
+  }
+
+  async function salvarNovoServico() {
+    erroServico = null
+    const name = novoServico.name.trim()
+    if (!name) {
+      erroServico = 'Escreva o nome do serviço.'
+      campoNomeServico?.focus()
+      return
+    }
+
+    salvandoServico = true
+    try {
+      const criado = await api.createService({
+        name,
+        category: novoServico.category.trim(),
+        priceCents: toCents(novoServico.price),
+        time: novoServico.time.trim(),
+      })
+      await refresh()
+      // Já escolhido na linha que pediu o cadastro, com nome e preço da
+      // tabela — o mesmo que aconteceria se ele já estivesse lá.
+      pickService(novoServico.alvo, criado.id)
+      novoServico = null
+    } catch (err) {
+      erroServico = err.message
+    } finally {
+      salvandoServico = false
+    }
+  }
+
+  function teclaNoServico(event) {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    salvarNovoServico()
   }
 
   // A conta mostrada aqui segue a mesma regra do banco: desconto e urgência
@@ -245,6 +315,7 @@
   function problemaNoFormulario() {
     // Cadastro aberto e não salvo: avisa em vez de engolir o que ela digitou.
     if (novoCliente) return 'Salve ou cancele o cadastro da cliente antes de continuar.'
+    if (novoServico) return 'Salve ou cancele o cadastro do serviço antes de continuar.'
     if (!Number(form.clientId)) return 'Escolha a cliente do pedido, ou cadastre uma nova.'
     if (servicosDoFormulario().filter((i) => i.qty > 0).length === 0) {
       return 'Adicione pelo menos um serviço.'
@@ -256,7 +327,16 @@
     form.pecas.push({ nome: '', servicos: [servicoVazio()] })
   }
 
+  /* Fecha o cadastro de serviço se a linha que o pediu saiu do pedido.
+     Sem isto o cadastro desapareceria da tela mas continuaria aberto por
+     dentro, e a validação pediria para salvar ou cancelar um formulário que
+     ela não tem mais como ver — o pedido ficaria travado. */
+  function esquecerCadastroDe(servicos) {
+    if (novoServico && servicos.includes(novoServico.alvo)) novoServico = null
+  }
+
   function removePeca(index) {
+    esquecerCadastroDe(form.pecas[index].servicos)
     form.pecas.splice(index, 1)
     // O pedido precisa de pelo menos um serviço para existir; o formulário
     // nunca fica sem nenhuma linha para preencher.
@@ -268,6 +348,7 @@
   }
 
   function removeServico(peca, index) {
+    esquecerCadastroDe([peca.servicos[index]])
     peca.servicos.splice(index, 1)
     if (peca.servicos.length > 0) return
 
@@ -280,8 +361,11 @@
 
   // Ao escolher um serviço da tabela, copia nome e preço para o item. O preço
   // fica editável depois, para permitir um ajuste pontual sem mexer na tabela.
-  function pickService(item, serviceId) {
-    const id = serviceId === '' ? null : Number(serviceId)
+  //
+  // id null é o serviço personalizado. O nome e o preço que estavam ali ficam
+  // como estão: viram o rascunho do campo de descrição, que é quase sempre
+  // uma variação do serviço da tabela que ela acabou de olhar.
+  function pickService(item, id) {
     item.serviceId = id
     const svc = data.services.find((s) => s.id === id)
     if (svc) {
@@ -400,8 +484,8 @@
     {#if novoCliente}
       <!-- Cadastro dentro do pedido. Não é um <form> dentro de outro — o HTML
            não permite —, por isso o Enter de cada campo é tratado à mão. -->
-      <div class="novo-cliente">
-        <div class="novo-cliente-titulo">
+      <div class="cadastro-embutido">
+        <div class="cadastro-embutido-titulo">
           <b>Cadastrar cliente</b>
           <button
             type="button"
@@ -449,7 +533,7 @@
           <p class="field-error">{erroCliente}</p>
         {/if}
 
-        <div class="novo-cliente-foot">
+        <div class="cadastro-embutido-foot">
           <button
             type="button"
             class="btn light small"
@@ -543,17 +627,12 @@
             {#each peca.servicos as servico, si}
               <div class="service-item">
                 <div class="service-row">
-                  <!-- Os value são strings de propósito: o <select> do DOM
-                       compara valores como texto. -->
-                  <select
-                    value={servico.serviceId === null ? '' : String(servico.serviceId)}
-                    onchange={(e) => pickService(servico, e.currentTarget.value)}
-                  >
-                    <option value="">Serviço personalizado</option>
-                    {#each data.services as s (s.id)}
-                      <option value={String(s.id)}>{s.name} — {money(s.priceCents)}</option>
-                    {/each}
-                  </select>
+                  <EscolherServico
+                    servicos={data.services}
+                    serviceId={servico.serviceId}
+                    onpick={(id) => pickService(servico, id)}
+                    onnovo={(nome) => abrirNovoServico(servico, nome)}
+                  />
                   <input
                     type="number"
                     min="1"
@@ -584,6 +663,100 @@
                     aria-label="Descrição do serviço personalizado"
                   />
                 {/if}
+
+                {#if novoServico?.alvo === servico}
+                  <!-- Cadastro do serviço na linha que o pediu, e não no pé do
+                       pedido: ela precisa ver em qual peça o serviço vai
+                       entrar. Não é um <form> dentro de outro — o HTML não
+                       permite —, por isso o Enter de cada campo é tratado à
+                       mão. -->
+                  <div class="cadastro-embutido">
+                    <div class="cadastro-embutido-titulo">
+                      <b>Cadastrar serviço na tabela de preços</b>
+                      <button
+                        type="button"
+                        class="close"
+                        aria-label="Fechar o cadastro de serviço"
+                        onclick={() => (novoServico = null)}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div class="grid2">
+                      <div class="form-group">
+                        <label for="nsn">Nome *</label>
+                        <input
+                          id="nsn"
+                          bind:this={campoNomeServico}
+                          bind:value={novoServico.name}
+                          onkeydown={teclaNoServico}
+                        />
+                      </div>
+                      <div class="form-group">
+                        <label for="nsp">Preço (R$)</label>
+                        <input
+                          id="nsp"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          bind:value={novoServico.price}
+                          onkeydown={teclaNoServico}
+                        />
+                      </div>
+                    </div>
+
+                    <div class="grid2">
+                      <div class="form-group">
+                        <label for="nsc">Categoria</label>
+                        <input
+                          id="nsc"
+                          list="categorias-do-atelie"
+                          bind:value={novoServico.category}
+                          onkeydown={teclaNoServico}
+                          placeholder="Ex.: Conserto"
+                        />
+                      </div>
+                      <div class="form-group">
+                        <label for="nst">Tempo</label>
+                        <input
+                          id="nst"
+                          bind:value={novoServico.time}
+                          onkeydown={teclaNoServico}
+                          placeholder="Ex.: 30 min"
+                        />
+                      </div>
+                    </div>
+
+                    <p class="field-dica">
+                      Ao salvar, o serviço passa a valer para os próximos
+                      pedidos e já entra neste, nesta peça. O preço continua
+                      editável aqui no pedido, sem mexer na tabela.
+                    </p>
+
+                    {#if erroServico}
+                      <p class="field-error">{erroServico}</p>
+                    {/if}
+
+                    <div class="cadastro-embutido-foot">
+                      <button
+                        type="button"
+                        class="btn light small"
+                        onclick={() => (novoServico = null)}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        class="btn small"
+                        disabled={salvandoServico}
+                        onclick={salvarNovoServico}
+                      >
+                        {salvandoServico ? 'Salvando…' : 'Salvar serviço'}
+                      </button>
+                    </div>
+                  </div>
+                {/if}
               </div>
             {/each}
 
@@ -599,6 +772,13 @@
       <datalist id="pecas-do-atelie">
         {#each sugestoesDePeca as p (p)}
           <option value={p}></option>
+        {/each}
+      </datalist>
+
+      <!-- Idem para as categorias, usadas pelo cadastro de serviço. -->
+      <datalist id="categorias-do-atelie">
+        {#each categoriasDeServico as c (c)}
+          <option value={c}></option>
         {/each}
       </datalist>
       <button type="button" class="btn light small" style="margin-top:8px" onclick={addPeca}>
