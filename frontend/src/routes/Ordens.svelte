@@ -3,6 +3,7 @@
   import PagamentoModal from './PagamentoModal.svelte'
   import Comprovante from './Comprovante.svelte'
   import AvisarWhatsapp from '../lib/AvisarWhatsapp.svelte'
+  import ReceberNaRetirada from '../lib/ReceberNaRetirada.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate, refresh } from '../lib/data.svelte.js'
   import {
@@ -16,6 +17,7 @@
     retiradaDaPeca,
     entregaDaPeca,
     contagemDeRetiradas,
+    precisaConferir,
     fmtDate,
     ORDER_STATUSES,
   } from '../lib/format.js'
@@ -27,6 +29,7 @@
   let printing = $state(null)
   let avisando = $state(null)
   let pagando = $state(null)
+  let cobrando = $state(null)
 
   // Só a busca por texto, sem a etapa nem o filtro de pendentes. É a base das
   // contagens das etapas: procurando por "Ana", cada etapa mostra quantos
@@ -93,6 +96,19 @@
     if (!ok) {
       await refresh()
       tabelaVersao++
+      return
+    }
+
+    /* Pedido marcado como entregue com saldo aberto: pergunta na hora se a
+       cliente pagou.
+
+       É a mesma pergunta da caixinha de retirada na agenda, no outro caminho
+       pelo qual uma peça sai do ateliê. Sem ela, o saldo fica aberto sem
+       ninguém saber se é dívida ou baixa esquecida — e é esse saldo que
+       depois vira cobrança repetida. */
+    if (status === 'Entregue') {
+      const atual = data.orders.find((o) => o.id === order.id)
+      if (atual && precisaConferir(atual)) cobrando = atual
     }
   }
 
@@ -278,4 +294,12 @@
 
 {#if avisando}
   <AvisarWhatsapp order={avisando} onclose={() => (avisando = null)} />
+{/if}
+
+{#if cobrando}
+  <ReceberNaRetirada
+    order={cobrando}
+    onclose={() => (cobrando = null)}
+    onpagamentos={(pedido) => (pagando = pedido)}
+  />
 {/if}

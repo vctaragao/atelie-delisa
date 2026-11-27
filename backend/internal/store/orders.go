@@ -14,7 +14,8 @@ const orderCols = `
   o.discount_percent, o.rush_percent,
   COALESCE(t.items_cents, 0), COALESCE(t.discount_cents, 0),
   COALESCE(t.rush_cents, 0), COALESCE(t.total_cents, 0),
-  COALESCE((SELECT SUM(p.value_cents) FROM order_payments p WHERE p.order_id = o.id), 0)`
+  COALESCE((SELECT SUM(p.value_cents) FROM order_payments p WHERE p.order_id = o.id), 0),
+  o.pay_later_at`
 
 const orderFrom = `
   FROM orders o
@@ -28,7 +29,7 @@ func scanOrder(row interface{ Scan(...any) error }) (Order, error) {
 		&o.Date, &o.Due, &o.DueTime, &o.Status, &o.Payment, &o.Paid, &o.Notes,
 		&o.DiscountPercent, &o.RushPercent,
 		&o.ItemsCents, &o.DiscountCents, &o.RushCents, &o.TotalCents,
-		&o.PaidCents,
+		&o.PaidCents, &o.PayLaterAt,
 	)
 	// O saldo pode ficar negativo: pagamento a mais existe, e esconder isso
 	// faria a tela mentir sobre o que a cliente entregou.
@@ -279,6 +280,29 @@ func (s *Store) SetPieceDelivered(orderID int64, piece, deliveredAt string) (Ord
 		return Order{}, ErrNotFound
 	}
 	return s.GetOrder(orderID)
+}
+
+// SetPayLater guarda que a cliente levou a peça devendo e ficou combinado
+// que paga depois, na data em que isso foi combinado. É a resposta "vai pagar
+// depois" da pergunta que aparece quando uma peça sai com saldo aberto.
+//
+// O que isso muda não é o dinheiro — o saldo continua igual — e sim o que o
+// saldo significa: dívida conferida, em vez de uma baixa que pode ter sido
+// esquecida. Sem essa diferença as duas aparecem iguais na tela, e é daí que
+// sai a cobrança repetida.
+//
+// `at` vazio desfaz o combinado, e o pedido volta para a lista de
+// conferência: marcar por engano tem de ter volta, senão o engano vira um
+// pedido que nunca mais será conferido.
+func (s *Store) SetPayLater(id int64, at string) (Order, error) {
+	res, err := s.db.Exec(`UPDATE orders SET pay_later_at = ? WHERE id = ?`, at, id)
+	if err != nil {
+		return Order{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Order{}, ErrNotFound
+	}
+	return s.GetOrder(id)
 }
 
 func (s *Store) DeleteOrder(id int64) error {

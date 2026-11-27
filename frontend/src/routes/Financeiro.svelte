@@ -1,5 +1,6 @@
 <script>
   import Modal from '../lib/Modal.svelte'
+  import PagamentoModal from './PagamentoModal.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
   import {
@@ -10,6 +11,9 @@
     temSaldoAberto,
     faltaReceber,
     statusClass,
+    precisaConferir,
+    combinadoParaDepois,
+    ultimaRetirada,
     FORMAS_DE_RECEBIMENTO,
   } from '../lib/format.js'
 
@@ -29,11 +33,52 @@
 
      Mais antigo primeiro porque é o que está parado há mais tempo, e é por
      ele que se começa a cobrar. */
-  const pendentes = $derived(
-    data.orders
-      .filter(temSaldoAberto)
-      .sort((a, b) => (a.date === b.date ? Number(a.number) - Number(b.number) : a.date < b.date ? -1 : 1)),
+  const maisAntigoPrimeiro = (a, b) =>
+    a.date === b.date ? Number(a.number) - Number(b.number) : a.date < b.date ? -1 : 1
+
+  const pendentes = $derived(data.orders.filter(temSaldoAberto).sort(maisAntigoPrimeiro))
+
+  /* A conferência: peça já fora do ateliê e saldo aberto que ninguém
+     confirmou.
+
+     Este é o remédio para a cobrança repetida. O trabalho do ateliê é manual
+     e o pagamento acontece no balcão: vez ou outra a cliente paga em dinheiro,
+     leva a peça, e a baixa não é lançada no meio do atendimento. Dias depois a
+     tela mostra "a receber" e a mesma cliente é cobrada de novo.
+
+     O sistema não tem como saber quem pagou — mas tem como saber de quem a
+     dúvida é razoável, e é esta lista: a peça saiu, o dinheiro não consta, e
+     ninguém disse "ela levou devendo". Por construção é uma lista curta, de
+     revisar no fim do dia, enquanto ela ainda lembra de quem pagou em
+     dinheiro.
+
+     Quem já foi conferido sai daqui: ou entra uma baixa, ou fica registrado
+     como combinado para depois. */
+  const aConferir = $derived(data.orders.filter(precisaConferir).sort(maisAntigoPrimeiro))
+
+  const totalAConferir = $derived(
+    aConferir.reduce((soma, o) => soma + faltaReceber(o), 0),
   )
+
+  /* As clientes que levaram devendo, de combinado. Não é pendência de
+     conferência — é dívida que ela já sabe que existe —, mas fica à vista
+     logo abaixo para a conferência ter um "desfazer": marcado por engano, o
+     pedido tem de poder voltar para a lista de cima. */
+  const combinados = $derived(
+    data.orders.filter(combinadoParaDepois).sort(maisAntigoPrimeiro),
+  )
+
+  let pagando = $state(null)
+
+  /** "Ela levou devendo mesmo": o saldo continua, a dúvida acaba. */
+  async function confirmarDivida(order) {
+    await mutate(() => api.setPayLater(order.id, today()))
+  }
+
+  /** Desfaz o combinado, e o pedido volta para a lista de conferência. */
+  async function desfazerCombinado(order) {
+    await mutate(() => api.setPayLater(order.id, ''))
+  }
 
   /**
    * O movimento do caixa: os lançamentos escritos à mão e as baixas dos
@@ -201,6 +246,130 @@
   </div>
 </div>
 
+<!-- A conferência vem antes dos pagamentos pendentes de propósito: pendente é
+     o que ela sabe que está devendo, e isto é o que ela ainda não sabe. -->
+{#if aConferir.length}
+  <div class="card">
+    <div class="section-title">
+      <h2>Conferir pagamentos</h2>
+      <span class="agenda-resumo">
+        {aConferir.length === 1 ? '1 pedido' : `${aConferir.length} pedidos`} ·
+        {money(totalAConferir)}
+      </span>
+    </div>
+
+    <div class="notice">
+      Estas peças já saíram do ateliê e o pagamento não consta no sistema. Pode
+      ser que a cliente esteja devendo — ou que o dinheiro tenha entrado no
+      balcão e a baixa não tenha sido lançada no meio do atendimento. Confira
+      uma por uma: <b>lance o pagamento</b> ou diga que ela <b>levou devendo</b>.
+      É o que evita cobrar quem já pagou.
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido</th><th>Cliente</th><th>Saiu em</th><th>Etapa</th>
+            <th>Total</th><th>Já pago</th><th>Falta</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each aConferir as o (o.id)}
+            <tr>
+              <td><b>#{o.number}</b></td>
+              <td style="white-space:normal">{o.clientName}</td>
+              <td>
+                <!-- O dia em que a última peça saiu. O pedido movido direto
+                     para "Entregue", sem marcar as peças, não tem essa data:
+                     vale a data combinada da entrega. -->
+                {#if ultimaRetirada(o)}
+                  {fmtDate(ultimaRetirada(o))}
+                {:else}
+                  <span class="agenda-resumo">entrega {fmtDate(o.due)}</span>
+                {/if}
+              </td>
+              <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
+              <td>{money(o.totalCents)}</td>
+              <td>
+                {#if o.paidCents > 0}
+                  {money(o.paidCents)}
+                {:else}
+                  <span class="agenda-resumo">nada ainda</span>
+                {/if}
+              </td>
+              <td><b class="devendo">{money(faltaReceber(o))}</b></td>
+              <td>
+                <div class="actions">
+                  <button class="btn small" onclick={() => (pagando = o)}>
+                    Lançar pagamento
+                  </button>
+                  <button
+                    class="btn light small"
+                    onclick={() => confirmarDivida(o)}
+                    title="A cliente levou a peça sem pagar, e isso foi combinado"
+                  >
+                    Levou devendo
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{/if}
+
+{#if combinados.length}
+  <div class="card">
+    <div class="section-title">
+      <h2>Levaram devendo, de combinado</h2>
+      <span class="agenda-resumo">
+        {combinados.length === 1 ? '1 pedido' : `${combinados.length} pedidos`} ·
+        {money(combinados.reduce((soma, o) => soma + faltaReceber(o), 0))}
+      </span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido</th><th>Cliente</th><th>Combinado em</th><th>Falta</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each combinados as o (o.id)}
+            <tr>
+              <td><b>#{o.number}</b></td>
+              <td style="white-space:normal">{o.clientName}</td>
+              <td>{fmtDate(o.payLaterAt)}</td>
+              <td><b class="devendo">{money(faltaReceber(o))}</b></td>
+              <td>
+                <div class="actions">
+                  <button class="btn small" onclick={() => (pagando = o)}>
+                    Lançar pagamento
+                  </button>
+                  <!-- Marcado por engano tem volta: sem isto, um clique errado
+                       tiraria o pedido da conferência para sempre. -->
+                  <button class="btn light small" onclick={() => desfazerCombinado(o)}>
+                    Não foi combinado
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <p class="field-dica">
+      Estas você já conferiu: a peça saiu e ficou combinado que a cliente paga
+      depois. Elas continuam no <b>Total pendente</b>, porque o dinheiro ainda
+      não entrou.
+    </p>
+  </div>
+{/if}
+
 <div class="card">
   <div class="section-title">
     <h2>Pagamentos pendentes</h2>
@@ -343,6 +512,10 @@
     </table>
   </div>
 </div>
+
+{#if pagando}
+  <PagamentoModal order={pagando} onclose={() => (pagando = null)} />
+{/if}
 
 {#if adding}
   <Modal title="Novo lançamento" onclose={() => (adding = false)}>

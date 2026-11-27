@@ -298,6 +298,45 @@ export function temSaldoAberto(order) {
 }
 
 /**
+ * O pedido já saiu do ateliê, pelo menos em parte: alguma peça foi retirada,
+ * ou a etapa diz que o pedido está entregue.
+ *
+ * As duas coisas valem porque ela usa as duas: marca a caixinha da peça na
+ * agenda, ou move o pedido inteiro para "Entregue" na lista de ordens.
+ */
+export function jaSaiuDoAtelie(order) {
+  if (order?.status === 'Entregue') return true
+  return (order?.items || []).some((i) => i.deliveredAt)
+}
+
+/**
+ * O pedido precisa ser conferido: a peça já saiu, o saldo está aberto e
+ * ninguém disse que a cliente levou devendo.
+ *
+ * É o caso que gera a cobrança repetida. O saldo pode ser dívida de verdade
+ * ou uma baixa que não foi lançada no meio do atendimento, e as duas aparecem
+ * iguais na tela — até alguém conferir. Confirmado o combinado (`payLaterAt`),
+ * o pedido sai desta lista e continua apenas no "a receber", onde deve estar.
+ */
+export function precisaConferir(order) {
+  return temSaldoAberto(order) && jaSaiuDoAtelie(order) && !order?.payLaterAt
+}
+
+/** A cliente levou devendo e ficou combinado que paga depois. */
+export function combinadoParaDepois(order) {
+  return temSaldoAberto(order) && Boolean(order?.payLaterAt)
+}
+
+/** O dia em que a última peça do pedido saiu do ateliê, se alguma saiu. */
+export function ultimaRetirada(order) {
+  return (order?.items || [])
+    .map((i) => i.deliveredAt)
+    .filter(Boolean)
+    .sort()
+    .pop() || ''
+}
+
+/**
  * Junta os serviços do pedido pela peça de roupa, mantendo a ordem em que
  * cada peça aparece: [{ peca, itens }]. Os serviços sem peça informada ficam
  * num grupo de peca vazia.

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 
@@ -248,5 +249,85 @@ func TestMigracaoDePagamentosHerdaOQueJaEstavaPago(t *testing.T) {
 	}
 	if n != 0 {
 		t.Errorf("o pedido em aberto ganhou %d pagamento(s), esperava nenhum", n)
+	}
+}
+
+// TestCombinadoDePagarDepoisSobreviveAoCicloCompleto cobre a diferença que a
+// migração 0009 trouxe: um saldo aberto pode ser dívida conferida ou uma
+// baixa esquecida, e só o pay_later_at separa as duas. Se ele se perder numa
+// edição do pedido ou num backup, o pedido volta para a lista de conferência
+// e a cliente que já foi conferida é cobrada de novo — exatamente o erro que
+// a coluna existe para evitar.
+func TestCombinadoDePagarDepoisSobreviveAoCicloCompleto(t *testing.T) {
+	s := bancoDeTeste(t)
+	pedido := pedidoDeTeste(t, s, 20000)
+
+	// Todo pedido nasce sem combinado nenhum: ninguém conferiu nada ainda.
+	if pedido.PayLaterAt != "" {
+		t.Fatalf("pedido novo já veio combinado: %q", pedido.PayLaterAt)
+	}
+
+	// A cliente leva a peça e fica combinado que paga na semana seguinte.
+	combinado, err := s.SetPayLater(pedido.ID, "2026-10-24")
+	if err != nil {
+		t.Fatalf("combinando o pagamento: %v", err)
+	}
+	if combinado.PayLaterAt != "2026-10-24" {
+		t.Errorf("o combinado veio %q, esperava 2026-10-24", combinado.PayLaterAt)
+	}
+	// O combinado não é dinheiro: o saldo continua aberto, e é isso que mantém
+	// o pedido na lista de quem está devendo.
+	if combinado.BalanceCents != 20000 {
+		t.Errorf("o combinado mexeu no saldo: %d", combinado.BalanceCents)
+	}
+
+	lido, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo: %v", err)
+	}
+	if lido.PayLaterAt != "2026-10-24" {
+		t.Errorf("relendo, o combinado veio %q", lido.PayLaterAt)
+	}
+
+	// Editar o pedido não pode desfazer o combinado: quem manda nele é a sua
+	// própria rota, e um pedido reescrito sem ele voltaria a parecer dívida
+	// não conferida.
+	editado, err := s.UpdateOrder(lido.ID, lido)
+	if err != nil {
+		t.Fatalf("editando: %v", err)
+	}
+	if editado.PayLaterAt != "2026-10-24" {
+		t.Errorf("editar o pedido desfez o combinado: %q", editado.PayLaterAt)
+	}
+
+	// O backup é o que ela exporta antes de mexer em produção.
+	backup, err := s.Export()
+	if err != nil {
+		t.Fatalf("exportando: %v", err)
+	}
+	if err := s.Import(backup); err != nil {
+		t.Fatalf("restaurando: %v", err)
+	}
+	restaurado, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo o restaurado: %v", err)
+	}
+	if restaurado.PayLaterAt != "2026-10-24" {
+		t.Errorf("o backup perdeu o combinado: %q", restaurado.PayLaterAt)
+	}
+
+	// Marcado por engano tem volta, senão o engano vira um pedido que nunca
+	// mais será conferido.
+	desfeito, err := s.SetPayLater(pedido.ID, "")
+	if err != nil {
+		t.Fatalf("desfazendo o combinado: %v", err)
+	}
+	if desfeito.PayLaterAt != "" {
+		t.Errorf("o combinado continuou marcado: %q", desfeito.PayLaterAt)
+	}
+
+	// Pedido que não existe precisa dizer isso, e não combinar em silêncio.
+	if _, err := s.SetPayLater(pedido.ID+999, "2026-10-24"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("pedido inexistente devolveu %v, esperava ErrNotFound", err)
 	}
 }

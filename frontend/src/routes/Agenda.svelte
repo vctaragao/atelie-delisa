@@ -1,6 +1,8 @@
 <script>
   import OrderModal from './OrderModal.svelte'
   import AvisarWhatsapp from '../lib/AvisarWhatsapp.svelte'
+  import ReceberNaRetirada from '../lib/ReceberNaRetirada.svelte'
+  import PagamentoModal from './PagamentoModal.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
   import {
@@ -22,6 +24,7 @@
     atrasado,
     todasAsEntregas,
     retiradaDaPeca,
+    precisaConferir,
     DIAS_DA_SEMANA,
     ORDER_STATUSES,
   } from '../lib/format.js'
@@ -48,6 +51,11 @@
   let mostrarConcluidos = $state(false)
   let editing = $state(null)
   let avisando = $state(null)
+
+  // O pedido cuja peça acabou de sair com saldo aberto: a pergunta "a cliente
+  // pagou?" fica aberta sobre a agenda até ela responder.
+  let cobrando = $state(null)
+  let pagando = $state(null)
 
   const emAberto = (o) => !CONCLUIDOS.includes(o.status)
   const visivel = (o) => mostrarConcluidos || emAberto(o)
@@ -144,7 +152,11 @@
     // para ela, para a tela não afirmar uma coisa que não foi gravada.
     if (!(await mutate(() => api.setOrderStatus(order.id, status)))) {
       caixinha.value = order.status
+      return
     }
+    // Mover o pedido para "Entregue" é dizer que ele saiu do ateliê inteiro,
+    // e vale a mesma pergunta da caixinha da peça.
+    if (status === 'Entregue') perguntarDoPagamento(order.id)
   }
 
   /* Baixa da retirada, peça por peça, sem abrir o pedido: é o que ela faz com
@@ -159,7 +171,27 @@
     const ok = await mutate(() =>
       api.setPieceDelivered(entrega.id, peca, levou ? hoje : ''),
     )
-    if (!ok) caixinha.checked = !levou
+    if (!ok) {
+      caixinha.checked = !levou
+      return
+    }
+    if (levou) perguntarDoPagamento(entrega.id)
+  }
+
+  /* A pergunta do pagamento, no instante em que a peça sai.
+
+     É aqui que a baixa se perdia: o dinheiro é recebido no balcão e o
+     lançamento ficava para "depois", que às vezes não vinha — e dias depois a
+     mesma cliente era cobrada de novo. Marcar a retirada é o único momento em
+     que o sistema sabe que a peça está saindo, com a cliente ainda na frente
+     dela. É o momento de perguntar.
+
+     Só pergunta quando há o que receber. O pedido já quitado, que é a maioria,
+     não interrompe nada. O que já foi combinado como "paga depois" também não
+     pergunta de novo: ela já respondeu uma vez. */
+  function perguntarDoPagamento(orderID) {
+    const atual = data.orders.find((o) => o.id === orderID)
+    if (atual && precisaConferir(atual)) cobrando = atual
   }
 </script>
 
@@ -490,4 +522,19 @@
 
 {#if avisando}
   <AvisarWhatsapp order={avisando} onclose={() => (avisando = null)} />
+{/if}
+
+<!-- A pergunta do pagamento, logo depois de a peça ser marcada como saída.
+     "Pagou só uma parte" fecha esta e abre a tela de pagamentos, onde ela
+     digita o valor recebido. -->
+{#if cobrando}
+  <ReceberNaRetirada
+    order={cobrando}
+    onclose={() => (cobrando = null)}
+    onpagamentos={(pedido) => (pagando = pedido)}
+  />
+{/if}
+
+{#if pagando}
+  <PagamentoModal order={pagando} onclose={() => (pagando = null)} />
 {/if}

@@ -1120,6 +1120,43 @@ label,
   .pagamento-conta { grid-template-columns: 1fr; }
 }
 
+/* A pergunta da retirada: "a cliente pagou?". A cliente está na frente dela
+   enquanto esta tela está aberta, então as formas de pagamento são botões
+   grandes, lado a lado, e não um <select> para abrir e escolher. */
+.receber-conta {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.receber-formas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.receber-formas .btn { flex: 1; min-width: 140px; }
+
+/* As outras duas respostas ficam separadas das formas por uma linha: são
+   caminhos diferentes, e não mais botões da mesma fileira. */
+.receber-outras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.receber-outras .btn { flex: 1; min-width: 160px; }
+
+/* O aviso de conferência, no Dashboard e no alto do Financeiro. Mais forte
+   que o .notice comum porque é dinheiro que pode estar escapando. */
+.conferir-aviso {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.conferir-aviso > span { flex: 1; min-width: 200px; }
+
 /* Entrega e retirada de uma peça, no cabeçalho do bloco dela. A linha é
    compacta de propósito: é informação do pedido, não o assunto principal do
    bloco, que são os serviços. */
