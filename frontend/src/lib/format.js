@@ -162,9 +162,115 @@ const SEM_ATRASO = ['Pronto', 'Entregue', 'Cancelado']
  *
  * Mora aqui porque a tela da agenda e o quadro da segunda tela precisam
  * contar a mesma coisa como atrasada.
+ *
+ * Serve tanto para o pedido inteiro quanto para uma entrega de peça (ver
+ * entregasDoPedido): as duas têm due, dueTime, status e items, e a conta é a
+ * mesma.
  */
 export function atrasado(order, hoje = today()) {
-  return Boolean(order?.due) && order.due < hoje && !SEM_ATRASO.includes(order.status)
+  if (!order?.due || order.due >= hoje) return false
+  if (SEM_ATRASO.includes(order.status)) return false
+  // Peça que a cliente já levou não é trabalho atrasado, mesmo que a etapa do
+  // pedido ainda não tenha sido mudada: ela saiu do ateliê.
+  return !todasRetiradas(order.items)
+}
+
+/* ---------- entrega e retirada por peça ----------
+
+   A entrega era do pedido inteiro, e passou a poder ser de cada peça: a calça
+   fica para sexta e o vestido para segunda. A data da peça é a exceção, e a
+   do pedido continua sendo a combinação geral — peça sem data própria segue o
+   pedido. É isso que faz o pedido comum, com tudo para o mesmo dia, continuar
+   se comportando como antes em todas as telas. */
+
+/**
+ * A entrega combinada para uma peça: a dela, quando tem; senão a do pedido.
+ * `propria` diz qual das duas é, para a tela poder mostrar a diferença.
+ */
+export function entregaDaPeca(order, itens) {
+  // Os três campos são gravados iguais em todos os serviços da peça, então o
+  // primeiro item responde pela peça toda.
+  const primeiro = (itens || [])[0] || {}
+  if (primeiro.due) {
+    return { due: primeiro.due, dueTime: primeiro.dueTime || '', propria: true }
+  }
+  return { due: order?.due || '', dueTime: order?.dueTime || '', propria: false }
+}
+
+/** O dia em que a cliente levou a peça, ou '' se ela ainda está no ateliê. */
+export function retiradaDaPeca(itens) {
+  return ((itens || [])[0] || {}).deliveredAt || ''
+}
+
+/** Todas as peças já saíram do ateliê. Pedido sem item nenhum não conta. */
+export function todasRetiradas(items) {
+  const lista = items || []
+  return lista.length > 0 && lista.every((i) => i.deliveredAt)
+}
+
+/** Quantas peças do pedido a cliente já levou, e quantas há no total. */
+export function contagemDeRetiradas(order) {
+  const grupos = groupItemsByPiece(order?.items)
+  return {
+    retiradas: grupos.filter((g) => retiradaDaPeca(g.itens)).length,
+    total: grupos.length,
+  }
+}
+
+/**
+ * As entregas de um pedido: uma para cada data e hora combinadas, com as
+ * peças que vencem nela.
+ *
+ * Cada entrega é uma cópia do pedido com a data, a hora e as peças daquele
+ * compromisso — assim a agenda, que já sabia desenhar um pedido, desenha uma
+ * entrega sem precisar aprender nada novo. `pedido` guarda o pedido de
+ * verdade: é ele que vai para a tela de edição, porque a cópia tem só parte
+ * dos serviços e salvá-la apagaria o resto.
+ *
+ * Pedido com tudo para o mesmo dia devolve uma entrega só, igual ao pedido
+ * inteiro. O desdobramento aparece apenas quando ela marca a data de uma
+ * peça.
+ */
+export function entregasDoPedido(order) {
+  const porData = new Map()
+
+  for (const grupo of groupItemsByPiece(order.items)) {
+    const { due, dueTime, propria } = entregaDaPeca(order, grupo.itens)
+    const chave = `${due}|${dueTime}`
+
+    let entrega = porData.get(chave)
+    if (!entrega) {
+      entrega = {
+        ...order,
+        due,
+        dueTime,
+        items: [],
+        pedido: order,
+        chave: `${order.id}-${chave}`,
+        pecasProprias: false,
+      }
+      porData.set(chave, entrega)
+    }
+    entrega.items.push(...grupo.itens)
+    if (propria) entrega.pecasProprias = true
+  }
+
+  // Pedido sem item nenhum não existe na prática, mas se existir ele não pode
+  // desaparecer da agenda por causa disso.
+  if (porData.size === 0) {
+    return [{ ...order, pedido: order, chave: `${order.id}-`, pecasProprias: false }]
+  }
+
+  const lista = [...porData.values()]
+  // A entrega é "parcial" quando o pedido tem mais de uma: é o que a tela
+  // avisa, para ela não achar que o pedido todo sai naquele dia.
+  for (const e of lista) e.parcial = lista.length > 1
+  return lista
+}
+
+/** Todas as entregas de todos os pedidos, numa lista só. */
+export function todasAsEntregas(orders) {
+  return (orders || []).flatMap(entregasDoPedido)
 }
 
 export const PAYMENT_METHODS = [

@@ -10,6 +10,8 @@
     listItems,
     porHora,
     atrasado,
+    todasAsEntregas,
+    todasRetiradas,
   } from '../lib/format.js'
 
   // A cópia de teste e o sistema de verdade rodam no mesmo navegador, e o
@@ -51,16 +53,21 @@
   // O dia de hoje mostra também o que já foi entregue, riscado: num quadro
   // de parede vale ver o que saiu, não só o que falta. O cancelado sai de
   // vista — não é mais compromisso de ninguém.
+  /* O quadro conta pelas mesmas entregas da tela da agenda: um pedido com a
+     calça para hoje e o vestido para segunda aparece hoje com a calça. Se as
+     duas telas contassem diferente, a parede e a tela dela discordariam. */
+  const entregas = $derived(todasAsEntregas(data.orders))
+
   const deHoje = $derived(
-    data.orders.filter((o) => o.due === hoje && o.status !== 'Cancelado').sort(porHora),
+    entregas.filter((e) => e.due === hoje && e.status !== 'Cancelado').sort(porHora),
   )
   const faltamHoje = $derived(deHoje.filter(emAberto))
   const deAmanha = $derived(
-    data.orders.filter((o) => o.due === amanha && emAberto(o)).sort(porHora),
+    entregas.filter((e) => e.due === amanha && emAberto(e)).sort(porHora),
   )
   const atrasados = $derived(
-    data.orders
-      .filter((o) => atrasado(o, hoje))
+    entregas
+      .filter((e) => atrasado(e, hoje))
       .sort((a, b) => (a.due === b.due ? porHora(a, b) : a.due < b.due ? -1 : 1)),
   )
 
@@ -132,7 +139,7 @@
     {#if atrasados.length}
       <section class="painel-bloco atrasado">
         <h2>Atrasadas</h2>
-        {#each atrasados as o (o.id)}
+        {#each atrasados as o (o.chave)}
           <div class="painel-linha">
             <div class="painel-hora">
               {diaCurto(o.due)}
@@ -155,8 +162,8 @@
     <section class="painel-bloco">
       <h2>Hoje</h2>
       {#if deHoje.length}
-        {#each deHoje as o (o.id)}
-          <div class="painel-linha" class:feito={!emAberto(o)}>
+        {#each deHoje as o (o.chave)}
+          <div class="painel-linha" class:feito={!emAberto(o) || todasRetiradas(o.items)}>
             <div class="painel-hora">{fmtTime(o.dueTime)}</div>
             <div class="painel-quem">
               <strong>{o.clientName}</strong>
@@ -177,7 +184,7 @@
     {#if deAmanha.length}
       <section class="painel-bloco">
         <h2>Amanhã</h2>
-        {#each deAmanha as o (o.id)}
+        {#each deAmanha as o (o.chave)}
           <div class="painel-linha">
             <div class="painel-hora">{fmtTime(o.dueTime)}</div>
             <div class="painel-quem">

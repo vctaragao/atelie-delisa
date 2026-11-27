@@ -82,6 +82,11 @@ export const api = {
   // Trocar a etapa manda só a etapa: o pedido inteiro de volta reescreveria
   // os serviços à toa. As três devolvem o pedido já com a conta refeita.
   setOrderStatus: (id, status) => put(`/orders/${id}/status`, { status }),
+
+  // Baixa da retirada de uma peça. deliveredAt vazio desmarca, para a baixa
+  // feita por engano ter volta.
+  setPieceDelivered: (id, piece, deliveredAt) =>
+    put(`/orders/${id}/pieces/delivered`, { piece, deliveredAt }),
   addPayment: (id, p) => post(`/orders/${id}/payments`, p),
   deletePayment: (id, paymentId) => del(`/orders/${id}/payments/${paymentId}`),
 

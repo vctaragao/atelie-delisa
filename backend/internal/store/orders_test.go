@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 )
@@ -349,5 +350,133 @@ func TestPecaDoItemSobreviveAoCicloCompleto(t *testing.T) {
 	}
 	if restaurado.Items[0].Piece != "Calça jeans" || restaurado.Items[2].Piece != "Vestido de festa" {
 		t.Errorf("o backup perdeu as peças: %+v", restaurado.Items)
+	}
+}
+
+// TestEntregaPorPecaSobreviveAoCicloCompleto segue a data da peça e a baixa da
+// retirada pelos mesmos caminhos em que elas podem se perder: a gravação, a
+// releitura, a edição do pedido e o backup.
+//
+// O ponto perigoso é a edição: UpdateOrder apaga e reinsere todos os itens, e
+// os três campos novos moram no item. Se a tela deixar de mandá-los de volta,
+// ou se o INSERT esquecer uma coluna, a Maria abre o pedido para mudar um
+// preço e perde, sem erro nenhum, a peça que a cliente já levou.
+func TestEntregaPorPecaSobreviveAoCicloCompleto(t *testing.T) {
+	s := bancoDeTeste(t)
+
+	cliente, err := s.CreateClient(Client{Name: "Dona Delisa"})
+	if err != nil {
+		t.Fatalf("criando cliente: %v", err)
+	}
+
+	pedido, err := s.CreateOrder(Order{
+		ClientID: cliente.ID,
+		Date:     "2026-11-23",
+		Due:      "2026-11-30",
+		Status:   "Em produção",
+		Items: []OrderItem{
+			// A calça fica para sexta; o vestido segue a data do pedido.
+			{Name: "Bainha", Piece: "Calça jeans", Qty: 1, PriceCents: 2500,
+				Due: "2026-11-27", DueTime: "14:30"},
+			{Name: "Ajuste de cintura", Piece: "Calça jeans", Qty: 1, PriceCents: 3500,
+				Due: "2026-11-27", DueTime: "14:30"},
+			{Name: "Troca de zíper", Piece: "Vestido", Qty: 1, PriceCents: 3000},
+		},
+	})
+	if err != nil {
+		t.Fatalf("criando pedido: %v", err)
+	}
+
+	confere := func(quando string, o Order) {
+		t.Helper()
+		if len(o.Items) != 3 {
+			t.Fatalf("%s: esperava 3 itens, veio %d", quando, len(o.Items))
+		}
+		if o.Items[0].Due != "2026-11-27" || o.Items[0].DueTime != "14:30" {
+			t.Errorf("%s: a bainha veio com entrega %q %q",
+				quando, o.Items[0].Due, o.Items[0].DueTime)
+		}
+		if o.Items[1].Due != "2026-11-27" {
+			t.Errorf("%s: o ajuste de cintura veio com entrega %q", quando, o.Items[1].Due)
+		}
+		// O vestido sem data própria segue o pedido, e é isso que o vazio diz.
+		if o.Items[2].Due != "" || o.Items[2].DueTime != "" {
+			t.Errorf("%s: o vestido devia seguir o pedido, veio %q %q",
+				quando, o.Items[2].Due, o.Items[2].DueTime)
+		}
+	}
+	confere("ao criar", pedido)
+
+	lido, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo: %v", err)
+	}
+	confere("ao reler", lido)
+
+	// A cliente passa na sexta e leva a calça. O vestido continua no ateliê.
+	comCalcaEntregue, err := s.SetPieceDelivered(pedido.ID, "Calça jeans", "2026-11-27")
+	if err != nil {
+		t.Fatalf("dando baixa na calça: %v", err)
+	}
+	if comCalcaEntregue.Items[0].DeliveredAt != "2026-11-27" ||
+		comCalcaEntregue.Items[1].DeliveredAt != "2026-11-27" {
+		t.Errorf("a baixa não pegou os dois serviços da calça: %+v", comCalcaEntregue.Items)
+	}
+	if comCalcaEntregue.Items[2].DeliveredAt != "" {
+		t.Errorf("a baixa da calça levou o vestido junto: %q", comCalcaEntregue.Items[2].DeliveredAt)
+	}
+
+	// Editar o pedido não pode perder a retirada nem as datas das peças.
+	paraEditar := comCalcaEntregue
+	paraEditar.Items[2].PriceCents = 3200
+	editado, err := s.UpdateOrder(paraEditar.ID, paraEditar)
+	if err != nil {
+		t.Fatalf("editando: %v", err)
+	}
+	confere("depois de editar", editado)
+	if editado.Items[0].DeliveredAt != "2026-11-27" {
+		t.Errorf("editar o pedido apagou a retirada da calça: %q", editado.Items[0].DeliveredAt)
+	}
+	if editado.Items[2].DeliveredAt != "" {
+		t.Errorf("editar o pedido marcou o vestido como retirado: %q", editado.Items[2].DeliveredAt)
+	}
+
+	// Baixa registrada por engano tem volta.
+	desmarcado, err := s.SetPieceDelivered(pedido.ID, "Calça jeans", "")
+	if err != nil {
+		t.Fatalf("desmarcando a calça: %v", err)
+	}
+	if desmarcado.Items[0].DeliveredAt != "" || desmarcado.Items[1].DeliveredAt != "" {
+		t.Errorf("a calça continuou marcada como retirada: %+v", desmarcado.Items)
+	}
+
+	// Peça que não existe no pedido é erro, e não uma baixa silenciosa em nada.
+	if _, err := s.SetPieceDelivered(pedido.ID, "Paletó", "2026-11-27"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("peça inexistente devolveu %v, esperava ErrNotFound", err)
+	}
+	// Pedido que não existe é outro problema, e precisa dizer isso.
+	if _, err := s.SetPieceDelivered(pedido.ID+999, "Calça jeans", "2026-11-27"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("pedido inexistente devolveu %v, esperava ErrNotFound", err)
+	}
+
+	// O backup é o que ela exporta antes de mexer em produção: se ele perder a
+	// retirada, a restauração traz de volta peças que já saíram do ateliê.
+	if _, err := s.SetPieceDelivered(pedido.ID, "Calça jeans", "2026-11-27"); err != nil {
+		t.Fatalf("remarcando a calça: %v", err)
+	}
+	backup, err := s.Export()
+	if err != nil {
+		t.Fatalf("exportando: %v", err)
+	}
+	if err := s.Import(backup); err != nil {
+		t.Fatalf("restaurando: %v", err)
+	}
+	restaurado, err := s.GetOrder(pedido.ID)
+	if err != nil {
+		t.Fatalf("relendo o restaurado: %v", err)
+	}
+	confere("depois do backup", restaurado)
+	if restaurado.Items[0].DeliveredAt != "2026-11-27" {
+		t.Errorf("o backup perdeu a retirada da calça: %+v", restaurado.Items)
 	}
 }

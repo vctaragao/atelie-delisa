@@ -9,6 +9,8 @@
     toCents,
     fromCents,
     today,
+    fmtDate,
+    fmtDateTime,
     orderAmounts,
     prazoEmHoras,
     statusClass,
@@ -50,9 +52,13 @@
     return { serviceId: null, name: '', qty: 1, price: 0 }
   }
 
-  /** Monta os blocos do formulário a partir dos itens gravados no pedido. */
+  /** Monta os blocos do formulário a partir dos itens gravados no pedido.
+
+      A entrega e a retirada são da peça, e no banco estão repetidas em cada
+      serviço dela: aqui voltam a ser uma por bloco, lidas do primeiro serviço
+      que chegou. */
   function agruparPorPeca(items) {
-    if (!items?.length) return [{ nome: '', servicos: [servicoVazio()] }]
+    if (!items?.length) return [{ ...pecaVazia(), servicos: [servicoVazio()] }]
 
     const grupos = []
     for (const i of items) {
@@ -61,7 +67,13 @@
       // apareceu pela primeira vez.
       let grupo = grupos.find((g) => g.nome === nome)
       if (!grupo) {
-        grupo = { nome, servicos: [] }
+        grupo = {
+          nome,
+          due: i.due || '',
+          dueTime: i.dueTime || '',
+          deliveredAt: i.deliveredAt || '',
+          servicos: [],
+        }
         grupos.push(grupo)
       }
       grupo.servicos.push({
@@ -74,11 +86,32 @@
     return grupos
   }
 
+  function pecaVazia() {
+    return { nome: '', due: '', dueTime: '', deliveredAt: '' }
+  }
+
+  /* Marca ou desmarca a retirada da peça. Guarda o dia, e não um sim/não,
+     porque depois ela precisa saber quando a peça saiu — e o dia que vale é
+     hoje, que é quando a cliente está no balcão levando a peça.
+
+     Só mexe no formulário: a gravação acontece ao salvar o pedido, junto com
+     o resto. Quem dá baixa com a cliente na frente, sem abrir o pedido, usa o
+     botão da agenda ou da lista de ordens. */
+  function marcarRetirada(peca, levou) {
+    peca.deliveredAt = levou ? today() : ''
+  }
+
   /** Desmonta os blocos de volta em uma lista de serviços, cada um com a sua
-      peça. A ordem das peças e dos serviços dentro delas é preservada. */
+      peça. A ordem das peças e dos serviços dentro delas é preservada.
+
+      A entrega e a retirada do bloco vão repetidas em todos os serviços dele.
+      Elas precisam ir junto na gravação: salvar o pedido troca todos os itens
+      pelos que chegam, então um campo que não voltar daqui é um campo apagado
+      — ela mudaria um preço e perderia a peça que a cliente já levou. */
   function servicosDoFormulario() {
     const lista = []
     for (const peca of form.pecas) {
+      const due = (peca.due || '').trim()
       for (const s of peca.servicos) {
         lista.push({
           serviceId: s.serviceId,
@@ -86,6 +119,12 @@
           piece: (peca.nome || '').trim(),
           qty: Number(s.qty) || 1,
           priceCents: toCents(s.price),
+          due,
+          // Hora sem dia não tem onde aparecer na agenda; o backend descarta
+          // do mesmo jeito, e mandar já limpo evita a tela mostrar uma hora
+          // que não foi gravada.
+          dueTime: due ? (peca.dueTime || '').trim() : '',
+          deliveredAt: (peca.deliveredAt || '').trim(),
         })
       }
     }
@@ -324,7 +363,7 @@
   }
 
   function addPeca() {
-    form.pecas.push({ nome: '', servicos: [servicoVazio()] })
+    form.pecas.push({ ...pecaVazia(), servicos: [servicoVazio()] })
   }
 
   /* Fecha o cadastro de serviço se a linha que o pediu saiu do pedido.
@@ -623,6 +662,51 @@
                 </button>
               {/if}
             </div>
+
+            <!-- Entrega e retirada desta peça. Ficam no cabeçalho do bloco, e
+                 não em cada serviço, porque a cliente leva a peça inteira: a
+                 bainha e o ajuste de cintura da mesma calça saem juntos. -->
+            <div class="peca-entrega">
+              <label>
+                <span>Entrega desta peça</span>
+                <input
+                  type="date"
+                  bind:value={peca.due}
+                  aria-label="Data de entrega desta peça"
+                />
+              </label>
+              <label>
+                <span>Hora</span>
+                <input
+                  type="time"
+                  bind:value={peca.dueTime}
+                  disabled={!peca.due}
+                  aria-label="Hora de entrega desta peça"
+                />
+              </label>
+              <label class="peca-retirada">
+                <input
+                  type="checkbox"
+                  checked={Boolean(peca.deliveredAt)}
+                  onchange={(e) => marcarRetirada(peca, e.currentTarget.checked)}
+                />
+                <span>
+                  {#if peca.deliveredAt}
+                    A cliente levou em {fmtDate(peca.deliveredAt)}
+                  {:else}
+                    A cliente já levou
+                  {/if}
+                </span>
+              </label>
+            </div>
+
+            {#if !peca.due}
+              <p class="field-dica peca-dica">
+                Sem data própria, esta peça segue a entrega do pedido
+                {#if form.due}({fmtDateTime(form.due, form.dueTime)}){:else}(ainda
+                  a combinar){/if}.
+              </p>
+            {/if}
 
             {#each peca.servicos as servico, si}
               <div class="service-item">

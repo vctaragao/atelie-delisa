@@ -20,6 +20,8 @@
     porHora,
     faltaReceber,
     atrasado,
+    todasAsEntregas,
+    retiradaDaPeca,
     DIAS_DA_SEMANA,
     ORDER_STATUSES,
   } from '../lib/format.js'
@@ -50,17 +52,30 @@
   const emAberto = (o) => !CONCLUIDOS.includes(o.status)
   const visivel = (o) => mostrarConcluidos || emAberto(o)
 
-  // Todos os pedidos com data, agrupados pelo dia da entrega. O calendário lê
-  // este mapa quadradinho por quadradinho, em vez de varrer a lista inteira
-  // de pedidos 42 vezes.
+  /* A agenda trabalha com entregas, não com pedidos.
+
+     Uma entrega é um pedido num dia: as peças dele que vencem naquela data e
+     hora. O pedido com tudo para o mesmo dia tem uma entrega só e aparece
+     como antes; o que tem a calça para sexta e o vestido para segunda aparece
+     nos dois dias, cada um mostrando a peça daquele dia. É o que faz as datas
+     por peça servirem para planejar a semana.
+
+     Cada entrega é uma cópia do pedido com a data e as peças daquele
+     compromisso, então tudo o que a tela já desenhava continua valendo. O
+     pedido de verdade vem em `entrega.pedido`, e é ele que vai para a tela de
+     edição: salvar a cópia, que tem só parte dos serviços, apagaria o resto. */
+  const entregas = $derived(todasAsEntregas(data.orders))
+
+  // Todas as entregas com data, agrupadas pelo dia. O calendário lê este mapa
+  // quadradinho por quadradinho, em vez de varrer a lista inteira 42 vezes.
   const porDia = $derived.by(() => {
     const mapa = new Map()
-    for (const o of data.orders) {
-      if (!o.due || !visivel(o)) continue
-      if (!mapa.has(o.due)) mapa.set(o.due, [])
-      mapa.get(o.due).push(o)
+    for (const e of entregas) {
+      if (!e.due || !visivel(e)) continue
+      if (!mapa.has(e.due)) mapa.set(e.due, [])
+      mapa.get(e.due).push(e)
     }
-    for (const pedidos of mapa.values()) pedidos.sort(porHora)
+    for (const doDia of mapa.values()) doDia.sort(porHora)
     return mapa
   })
 
@@ -68,25 +83,29 @@
   const doDia = (iso) => porDia.get(iso) || []
 
   const atrasados = $derived(
-    data.orders.filter((o) => atrasado(o, hoje)).sort((a, b) =>
+    entregas.filter((e) => atrasado(e, hoje)).sort((a, b) =>
       a.due === b.due ? porHora(a, b) : a.due < b.due ? -1 : 1,
     ),
   )
-  const semData = $derived(data.orders.filter((o) => !o.due && visivel(o)))
+  const semData = $derived(entregas.filter((e) => !e.due && visivel(e)))
 
-  const deHoje = $derived(data.orders.filter((o) => o.due === hoje && emAberto(o)))
+  const deHoje = $derived(entregas.filter((e) => e.due === hoje && emAberto(e)))
   const doMes = $derived(
     [...porDia].filter(([dia]) => monthOf(dia) === mes).flatMap(([, pedidos]) => pedidos),
   )
   const selecionados = $derived(diaSelecionado ? doDia(diaSelecionado) : [])
 
-  const pecas = (pedidos) => pedidos.reduce((sum, o) => sum + orderQty(o), 0)
+  const pecas = (lista) => lista.reduce((sum, e) => sum + orderQty(e), 0)
 
-  /** "3 pedidos · 7 peças" — o resumo que vai nos títulos. */
-  function resumo(pedidos) {
-    const p = pedidos.length === 1 ? '1 pedido' : `${pedidos.length} pedidos`
-    const n = pecas(pedidos)
-    return `${p} · ${n === 1 ? '1 peça' : `${n} peças`}`
+  /** "3 entregas · 7 peças" — o resumo que vai nos títulos.
+
+      Conta entregas, e não pedidos: o pedido que tem peças para dois dias
+      aparece nos dois, e chamar isso de "2 pedidos" daria a entender que há
+      dois pedidos quando há um. */
+  function resumo(lista) {
+    const e = lista.length === 1 ? '1 entrega' : `${lista.length} entregas`
+    const n = pecas(lista)
+    return `${e} · ${n === 1 ? '1 peça' : `${n} peças`}`
   }
 
   /** Troca o mês mostrado. O dia aberto embaixo acompanha: hoje, se o mês for
@@ -127,7 +146,47 @@
       caixinha.value = order.status
     }
   }
+
+  /* Baixa da retirada, peça por peça, sem abrir o pedido: é o que ela faz com
+     a cliente na frente, levando a calça e deixando o vestido para depois.
+
+     A data gravada é hoje, que é o dia em que a peça está saindo. Desmarcar
+     apaga a data — a baixa feita por engano tem volta. Como na troca de
+     etapa, a caixinha volta ao que estava se a gravação falhar, para a tela
+     não afirmar que a peça saiu quando o banco não registrou. */
+  async function darBaixa(entrega, peca, caixinha) {
+    const levou = caixinha.checked
+    const ok = await mutate(() =>
+      api.setPieceDelivered(entrega.id, peca, levou ? hoje : ''),
+    )
+    if (!ok) caixinha.checked = !levou
+  }
 </script>
+
+<!-- As peças de uma entrega, cada uma com a caixinha de "a cliente levou".
+     As três listas da tela — atrasadas, do dia e sem data — mostram a mesma
+     coisa, e a baixa precisa estar disponível nas três: a peça atrasada é
+     justamente a que a cliente vem buscar. -->
+{#snippet pecasDaEntrega(entrega)}
+  {#each groupItemsByPiece(entrega.items) as g (g.peca)}
+    {@const levou = retiradaDaPeca(g.itens)}
+    <label class="peca-levou" class:levou={Boolean(levou)}>
+      <input
+        type="checkbox"
+        checked={Boolean(levou)}
+        onchange={(ev) => darBaixa(entrega, g.peca, ev.currentTarget)}
+        aria-label="A cliente levou {g.peca || 'a peça'} do pedido {entrega.number}"
+      />
+      <span>
+        {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+        {listItems(g.itens)}
+        {#if levou}
+          <span class="agenda-resumo">· levou em {fmtDate(levou)}</span>
+        {/if}
+      </span>
+    </label>
+  {/each}
+{/snippet}
 
 <div class="toolbar">
   <span style="flex:1"></span>
@@ -170,19 +229,21 @@
           </tr>
         </thead>
         <tbody>
-          {#each atrasados as o (o.id)}
+          {#each atrasados as o (o.chave)}
             <tr>
               <td>
                 {fmtDate(o.due)}
                 {#if o.dueTime}<br /><span class="agenda-hora">{o.dueTime}</span>{/if}
               </td>
-              <td><b>#{o.number}</b></td>
+              <td>
+                <b>#{o.number}</b>
+                {#if o.parcial}
+                  <span class="entrega-parcial" title="Este pedido tem peças em mais de um dia; aqui está a parte deste dia">parcial</span>
+                {/if}
+              </td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each groupItemsByPiece(o.items) as g (g.peca)}
-                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
-                  {listItems(g.itens)}<br />
-                {/each}
+                {@render pecasDaEntrega(o)}
               </td>
               <td><b>{orderQty(o)}</b></td>
               <td>
@@ -200,8 +261,8 @@
               <td>{money(o.totalCents)}</td>
               <td>
                 <div class="actions">
-                  <button class="btn light small" onclick={() => (editing = o)}>Editar</button>
-                  <button class="btn light small" onclick={() => (avisando = o)}>Avisar</button>
+                  <button class="btn light small" onclick={() => (editing = o.pedido)}>Editar</button>
+                  <button class="btn light small" onclick={() => (avisando = o.pedido)}>Avisar</button>
                 </div>
               </td>
             </tr>
@@ -266,7 +327,7 @@
               <span class="cal-contagem">{pecas(pedidos)} pç</span>
             {/if}
           </span>
-          {#each pedidos.slice(0, POR_DIA_NO_QUADRO) as o (o.id)}
+          {#each pedidos.slice(0, POR_DIA_NO_QUADRO) as o (o.chave)}
             <span class="cal-pedido {statusClass(o.status)}" title="#{o.number} · {o.clientName}">
               {#if o.dueTime}<b>{o.dueTime}</b>{/if}
               {o.clientName}
@@ -299,16 +360,18 @@
           </tr>
         </thead>
         <tbody>
-          {#each selecionados as o (o.id)}
+          {#each selecionados as o (o.chave)}
             <tr>
               <td><b class="agenda-hora">{fmtTime(o.dueTime)}</b></td>
-              <td><b>#{o.number}</b></td>
+              <td>
+                <b>#{o.number}</b>
+                {#if o.parcial}
+                  <span class="entrega-parcial" title="Este pedido tem peças em mais de um dia; aqui está a parte deste dia">parcial</span>
+                {/if}
+              </td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each groupItemsByPiece(o.items) as g (g.peca)}
-                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
-                  {listItems(g.itens)}<br />
-                {/each}
+                {@render pecasDaEntrega(o)}
               </td>
               <td><b>{orderQty(o)}</b></td>
               <td>
@@ -339,8 +402,8 @@
               </td>
               <td>
                 <div class="actions">
-                  <button class="btn light small" onclick={() => (editing = o)}>Editar</button>
-                  <button class="btn light small" onclick={() => (avisando = o)}>Avisar</button>
+                  <button class="btn light small" onclick={() => (editing = o.pedido)}>Editar</button>
+                  <button class="btn light small" onclick={() => (avisando = o.pedido)}>Avisar</button>
                 </div>
               </td>
             </tr>
@@ -376,15 +439,17 @@
           </tr>
         </thead>
         <tbody>
-          {#each semData as o (o.id)}
+          {#each semData as o (o.chave)}
             <tr>
-              <td><b>#{o.number}</b></td>
+              <td>
+                <b>#{o.number}</b>
+                {#if o.parcial}
+                  <span class="entrega-parcial" title="Este pedido tem peças em mais de um dia; aqui está a parte deste dia">parcial</span>
+                {/if}
+              </td>
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:170px">
-                {#each groupItemsByPiece(o.items) as g (g.peca)}
-                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
-                  {listItems(g.itens)}<br />
-                {/each}
+                {@render pecasDaEntrega(o)}
               </td>
               <td><b>{orderQty(o)}</b></td>
               <td>
@@ -402,8 +467,8 @@
               <td>{money(o.totalCents)}</td>
               <td>
                 <div class="actions">
-                  <button class="btn light small" onclick={() => (editing = o)}>Editar</button>
-                  <button class="btn light small" onclick={() => (avisando = o)}>Avisar</button>
+                  <button class="btn light small" onclick={() => (editing = o.pedido)}>Editar</button>
+                  <button class="btn light small" onclick={() => (avisando = o.pedido)}>Avisar</button>
                 </div>
               </td>
             </tr>

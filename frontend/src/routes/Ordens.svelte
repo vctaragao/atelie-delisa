@@ -12,6 +12,11 @@
     groupItemsByPiece,
     listItems,
     faltaReceber,
+    temSaldoAberto,
+    retiradaDaPeca,
+    entregaDaPeca,
+    contagemDeRetiradas,
+    fmtDate,
     ORDER_STATUSES,
   } from '../lib/format.js'
 
@@ -23,9 +28,9 @@
   let avisando = $state(null)
   let pagando = $state(null)
 
-  // Só a busca por texto, sem a etapa. É sobre esta lista que as contagens das
-  // etapas são feitas: procurando por "Ana", cada etapa mostra quantos pedidos
-  // da Ana estão nela.
+  // Só a busca por texto, sem a etapa nem o filtro de pendentes. É a base das
+  // contagens das etapas: procurando por "Ana", cada etapa mostra quantos
+  // pedidos da Ana estão nela.
   const encontrados = $derived.by(() => {
     const q = query.trim().toLowerCase()
     if (!q) return data.orders
@@ -41,19 +46,38 @@
     })
   })
 
+  /* Filtro de pagamento pendente, por cima do filtro de etapa. É o que
+     responde "quem está me devendo": o Financeiro mostra o total pendente, e
+     aqui ela chega aos pedidos que formam esse total, com o botão de
+     pagamentos à mão.
+
+     Pedido cancelado fica fora: ninguém cobra o que não vai ser feito, e é a
+     mesma regra que o temSaldoAberto já usa no resto do sistema. */
+  let soPendentes = $state(false)
+
+  const pendentes = $derived(encontrados.filter(temSaldoAberto))
+  const totalPendente = $derived(
+    pendentes.reduce((soma, o) => soma + faltaReceber(o), 0),
+  )
+
+  /* A lista sobre a qual as etapas são contadas. Com o filtro de pendentes
+     ligado, as contagens contam só os pendentes: senão a etapa diria "12
+     Pronto" e a tabela embaixo mostraria 3, e o número viraria um enigma. */
+  const base = $derived(soPendentes ? pendentes : encontrados)
+
   const filtered = $derived(
-    statusFilter ? encontrados.filter((o) => o.status === statusFilter) : encontrados,
+    statusFilter ? base.filter((o) => o.status === statusFilter) : base,
   )
 
   // As etapas do pedido como botões, com quantos pedidos há em cada uma. É o
   // que mostra, de uma olhada, que o ateliê tem orçamentos esperando resposta
   // e peças prontas esperando a cliente buscar.
   const etapas = $derived([
-    { id: '', label: 'Todos', conta: encontrados.length },
+    { id: '', label: 'Todos', conta: base.length },
     ...ORDER_STATUSES.map((s) => ({
       id: s,
       label: s,
-      conta: encontrados.filter((o) => o.status === s).length,
+      conta: base.filter((o) => o.status === s).length,
     })),
   ])
 
@@ -100,7 +124,29 @@
       <span class="etapa-conta">{e.conta}</span>
     </button>
   {/each}
+
+  <!-- O pagamento pendente não é uma etapa do pedido: é outro corte da mesma
+       lista, e por isso fica separado, à direita, e some junto com a etapa. -->
+  <button
+    class="etapa pendente-filtro"
+    class:ativa={soPendentes}
+    onclick={() => (soPendentes = !soPendentes)}
+    title="Mostrar só os pedidos com valor a receber"
+  >
+    💰 A receber
+    <span class="etapa-conta">{pendentes.length}</span>
+  </button>
 </div>
+
+{#if soPendentes}
+  <div class="notice">
+    Mostrando só os pedidos com pagamento pendente:
+    <b>{pendentes.length}</b>
+    {pendentes.length === 1 ? 'pedido' : 'pedidos'}, somando
+    <b>{money(totalPendente)}</b> a receber. Pedido cancelado não entra na
+    conta.
+  </div>
+{/if}
 
 <div class="card">
   {#key tabelaVersao}
@@ -120,11 +166,35 @@
               <td>{o.clientName}</td>
               <td style="white-space:normal;min-width:180px">
                 {#each groupItemsByPiece(o.items) as g (g.peca)}
-                  {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
-                  {listItems(g.itens)}<br />
+                  {@const levou = retiradaDaPeca(g.itens)}
+                  {@const entrega = entregaDaPeca(o, g.itens)}
+                  <div class="ordem-peca" class:levou={Boolean(levou)}>
+                    {#if g.peca}<b class="item-peca">{g.peca}:</b>{/if}
+                    {listItems(g.itens)}
+                    <!-- A data só aparece quando é da peça; a do pedido já
+                         está na coluna de entrega, ao lado. -->
+                    {#if entrega.propria}
+                      <span class="peca-data">{fmtDateTime(entrega.due, entrega.dueTime)}</span>
+                    {/if}
+                    {#if levou}
+                      <span class="agenda-resumo">levou em {fmtDate(levou)}</span>
+                    {/if}
+                  </div>
                 {/each}
               </td>
-              <td>{fmtDateTime(o.due, o.dueTime)}</td>
+              <td>
+                {fmtDateTime(o.due, o.dueTime)}
+                <!-- Quantas peças já saíram. O pedido só está realmente
+                     entregue quando a última sai, e a etapa ao lado não conta
+                     isso: ela é do pedido inteiro. -->
+                {#if contagemDeRetiradas(o).total > 1}
+                  {@const c = contagemDeRetiradas(o)}
+                  <br />
+                  <span class="agenda-resumo">
+                    {c.retiradas} de {c.total} peças entregues
+                  </span>
+                {/if}
+              </td>
               <td>
                 <!-- A etapa muda aqui mesmo, sem abrir o pedido: é o que ela
                      faz várias vezes por dia, peça por peça. -->
