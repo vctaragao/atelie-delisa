@@ -383,6 +383,42 @@ func (s *Server) setPieceDelivered(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// payLaterBody é o corpo de PUT /api/orders/{id}/pay-later: o dia em que
+// ficou combinado que a cliente paga depois. Vazio desfaz o combinado.
+type payLaterBody struct {
+	PayLaterAt string `json:"payLaterAt"`
+}
+
+// setPayLater registra que a peça saiu devendo de propósito — a cliente vai
+// pagar depois —, para o saldo aberto do pedido deixar de ser confundido com
+// uma baixa esquecida.
+func (s *Server) setPayLater(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in payLaterBody
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+
+	in.PayLaterAt = strings.TrimSpace(in.PayLaterAt)
+	if in.PayLaterAt != "" {
+		if _, err := time.Parse("2006-01-02", in.PayLaterAt); err != nil {
+			writeErr(w, http.StatusUnprocessableEntity,
+				"A data do combinado deve estar no formato AAAA-MM-DD.")
+			return
+		}
+	}
+
+	out, err := s.st.SetPayLater(id, in.PayLaterAt)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // createPayment dá baixa de um valor recebido. Devolve o pedido inteiro, e
 // não o pagamento: quem está na tela precisa ver na hora quanto ainda falta.
 func (s *Server) createPayment(w http.ResponseWriter, r *http.Request) {

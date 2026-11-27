@@ -10,6 +10,8 @@
     groupItemsByPiece,
     porHora,
     today,
+    precisaConferir,
+    faltaReceber,
   } from '../lib/format.js'
 
   let { goto } = $props()
@@ -45,6 +47,17 @@
       .slice(0, PROXIMAS)
   })
 
+  /* Peças que saíram do ateliê sem pagamento lançado.
+
+     O aviso fica no Dashboard porque é a primeira tela que ela abre. A lista
+     em si mora no Financeiro, mas uma lista que depende de ela se lembrar de
+     ir olhar não resolve o problema de quem esquece de dar baixa. */
+  const aConferir = $derived(data.orders.filter(precisaConferir))
+
+  const totalAConferir = $derived(
+    aConferir.reduce((soma, o) => soma + faltaReceber(o), 0),
+  )
+
   /** "Calça jeans, Vestido" — as peças que saem naquela entrega. */
   const pecasDaEntrega = (entrega) =>
     groupItemsByPiece(entrega.items)
@@ -52,6 +65,23 @@
       .filter(Boolean)
       .join(', ')
 </script>
+
+{#if aConferir.length}
+  <div class="notice urgencia conferir-aviso">
+    <span>
+      <b>
+        {aConferir.length === 1
+          ? '1 pedido saiu do ateliê'
+          : `${aConferir.length} pedidos saíram do ateliê`}
+      </b>
+      sem pagamento lançado, somando {money(totalAConferir)}. Pode ser dívida —
+      ou baixa que ficou para trás. Conferir antes de cobrar.
+    </span>
+    <button class="btn small" onclick={() => goto('financeiro')}>
+      Conferir agora
+    </button>
+  </div>
+{/if}
 
 <div class="cards">
   <div class="card">

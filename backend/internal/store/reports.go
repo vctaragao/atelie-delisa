@@ -162,10 +162,11 @@ func (s *Store) Import(b Backup) error {
 	for _, o := range b.Orders {
 		_, err := tx.Exec(
 			`INSERT INTO orders (id, number, client_id, date, due, due_time, status,
-			                     payment, notes, discount_percent, rush_percent)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			                     payment, notes, discount_percent, rush_percent,
+			                     pay_later_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			o.ID, o.Number, o.ClientID, o.Date, o.Due, o.DueTime, o.Status, o.Payment,
-			o.Notes, o.DiscountPercent, o.RushPercent,
+			o.Notes, o.DiscountPercent, o.RushPercent, o.PayLaterAt,
 		)
 		if err != nil {
 			return err

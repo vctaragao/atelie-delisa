@@ -87,6 +87,10 @@ export const api = {
   // feita por engano ter volta.
   setPieceDelivered: (id, piece, deliveredAt) =>
     put(`/orders/${id}/pieces/delivered`, { piece, deliveredAt }),
+
+  // "A cliente levou devendo, de propósito": a data em que isso ficou
+  // combinado. Vazio desfaz, e o pedido volta para a lista de conferência.
+  setPayLater: (id, payLaterAt) => put(`/orders/${id}/pay-later`, { payLaterAt }),
   addPayment: (id, p) => post(`/orders/${id}/payments`, p),
   deletePayment: (id, paymentId) => del(`/orders/${id}/payments/${paymentId}`),
 

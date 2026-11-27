@@ -81,6 +81,16 @@ type Order struct {
 	Payments        []Payment   `json:"payments"`
 	PaidCents       int64       `json:"paidCents"`
 	BalanceCents    int64       `json:"balanceCents"`
+
+	// PayLaterAt é o dia em que ficou combinado que a cliente paga depois —
+	// ela levou a peça devendo, e isso foi conferido, não esquecido. Vazio
+	// com a peça já fora do ateliê é o que põe o pedido na lista de
+	// conferência: pode ser uma baixa que ninguém lançou.
+	//
+	// Como Paid e Payments, só sai do banco: quem mexe nisso é a rota
+	// PUT /api/orders/{id}/pay-later, e mandá-la numa alteração do pedido não
+	// combina nada.
+	PayLaterAt string `json:"payLaterAt"`
 }
 
 type Transaction struct {
