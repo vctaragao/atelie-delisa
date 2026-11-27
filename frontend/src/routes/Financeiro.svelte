@@ -10,6 +10,7 @@
     temSaldoAberto,
     faltaReceber,
     statusClass,
+    FORMAS_DE_RECEBIMENTO,
   } from '../lib/format.js'
 
   let adding = $state(false)
@@ -72,6 +73,60 @@
     )
   })
 
+  /* O movimento separado por forma de pagamento — Pix, dinheiro, cartão.
+     É a conferência do fim do dia: quanto entrou pela máquina, quanto caiu na
+     conta, quanto está na gaveta. Antes a forma só aparecia numa coluna da
+     tabela, e somar o Pix do mês significava ler linha por linha.
+
+     As contas saem dos mesmos lançamentos da lista, então o que as pílulas
+     somam é exatamente o que a tabela mostra quando se clica nelas. */
+  const SEM_FORMA = 'Sem forma anotada'
+
+  const formaDe = (l) => (l.payment || '').trim() || SEM_FORMA
+
+  let forma = $state('')
+
+  const porForma = $derived.by(() => {
+    const contas = new Map()
+    for (const l of lancamentos) {
+      const f = formaDe(l)
+      const c = contas.get(f) ?? { forma: f, quantos: 0, entrou: 0, saiu: 0 }
+      c.quantos++
+      if (l.type === 'entrada') c.entrou += l.valueCents
+      else c.saiu += l.valueCents
+      contas.set(f, c)
+    }
+
+    /* As formas que o ateliê usa primeiro, na ordem em que aparecem nos
+       formulários, para a fileira não dançar a cada pagamento novo. Depois
+       vêm formas antigas que não estão mais na lista — dado gravado não se
+       esconde — e por último o que ficou sem anotar. */
+    const conhecidas = FORMAS_DE_RECEBIMENTO.filter((f) => contas.has(f))
+    const outras = [...contas.keys()]
+      .filter((f) => f !== SEM_FORMA && !FORMAS_DE_RECEBIMENTO.includes(f))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+    const semForma = contas.has(SEM_FORMA) ? [SEM_FORMA] : []
+
+    return [...conhecidas, ...outras, ...semForma].map((f) => contas.get(f))
+  })
+
+  /* A forma escolhida só vale enquanto existir algum lançamento nela. Se ela
+     excluir o último lançamento em dinheiro, a pílula desaparece e a lista
+     volta a mostrar tudo, em vez de ficar vazia sem explicação. */
+  const formaAtiva = $derived(
+    porForma.some((c) => c.forma === forma) ? forma : '',
+  )
+
+  const escolhida = $derived(porForma.find((c) => c.forma === formaAtiva))
+
+  const doFiltro = $derived(
+    formaAtiva ? lancamentos.filter((l) => formaDe(l) === formaAtiva) : lancamentos,
+  )
+
+  const totalQueEntrou = $derived(
+    porForma.reduce((soma, c) => soma + c.entrou, 0),
+  )
+
   function blank() {
     return { date: today(), type: 'entrada', description: '', value: '', payment: 'Pix' }
   }
@@ -111,6 +166,18 @@
     await mutate(() => api.deleteTransaction(tx.id))
   }
 </script>
+
+<!-- O botão de lançar fica aqui, no alto, como o "+ Novo cliente" em Clientes
+     e o "+ Novo serviço" em Serviços: é onde ela já aprendeu a procurar o
+     botão de cadastrar de cada tela. Antes ele estava no meio da página,
+     grudado embaixo da tabela de pagamentos pendentes, e parecia ser dela.
+
+     Por ter botão próprio, esta tela não mostra mais o "+ Novo pedido" do
+     topo — ver `botaoProprio` no App.svelte. Dois botões de cadastrar coisas
+     diferentes lado a lado é convite para clicar no errado. -->
+<div class="toolbar">
+  <button class="btn" onclick={open}>+ Lançamento</button>
+</div>
 
 <div class="cards">
   <div class="card">
@@ -187,18 +254,60 @@
   {/if}
 </div>
 
-<div class="toolbar">
-  <button class="btn" onclick={open}>+ Lançamento</button>
-</div>
-
 <div class="card">
+  <div class="section-title">
+    <h2>Movimento do caixa</h2>
+    <span class="agenda-resumo">
+      {lancamentos.length === 1 ? '1 lançamento' : `${lancamentos.length} lançamentos`}
+    </span>
+  </div>
+
+  <!-- Cada pílula mostra quanto entrou por aquela forma, e clicar deixa na
+       tabela só o movimento dela. Os quatro cartões lá em cima continuam
+       somando o ateliê inteiro: este corte é da lista, não do ateliê. -->
+  {#if porForma.length}
+    <div class="etapas" role="group" aria-label="Filtrar por forma de pagamento">
+      <button
+        class="etapa"
+        class:ativa={formaAtiva === ''}
+        onclick={() => (forma = '')}
+        title="Mostrar todo o movimento do caixa"
+      >
+        Todas as formas
+        <span class="etapa-conta">{money(totalQueEntrou)}</span>
+      </button>
+
+      {#each porForma as c (c.forma)}
+        <button
+          class="etapa"
+          class:ativa={formaAtiva === c.forma}
+          onclick={() => (forma = c.forma)}
+          title="{c.quantos === 1 ? '1 lançamento' : `${c.quantos} lançamentos`} em {c.forma}"
+        >
+          {c.forma}
+          <span class="etapa-conta">{money(c.entrou)}</span>
+        </button>
+      {/each}
+    </div>
+  {/if}
+
+  {#if formaAtiva}
+    <div class="notice">
+      Mostrando só o movimento em <b>{formaAtiva}</b>:
+      <b>{escolhida.quantos}</b>
+      {escolhida.quantos === 1 ? 'lançamento' : 'lançamentos'},
+      <b>{money(escolhida.entrou)}</b> que entrou{#if escolhida.saiu}
+        e <b>{money(escolhida.saiu)}</b> que saiu{/if}.
+    </div>
+  {/if}
+
   <div class="table-wrap">
     <table>
       <thead>
         <tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Forma</th><th>Valor</th><th></th></tr>
       </thead>
       <tbody>
-        {#each lancamentos as l (l.chave)}
+        {#each doFiltro as l (l.chave)}
           <tr>
             <td>{fmtDate(l.date)}</td>
             <td style="white-space:normal">
@@ -262,10 +371,13 @@
         </div>
         <div class="form-group">
           <label for="tp">Forma de pagamento</label>
+          <!-- As mesmas formas da baixa de um pedido, e não uma lista à
+               parte: "Cartão" aqui e "Cartão de crédito" na baixa viravam
+               duas pílulas diferentes para o mesmo cartão no filtro acima. -->
           <select id="tp" bind:value={form.payment}>
-            <option>Pix</option>
-            <option>Dinheiro</option>
-            <option>Cartão</option>
+            {#each FORMAS_DE_RECEBIMENTO as f (f)}
+              <option>{f}</option>
+            {/each}
             <option>Outro</option>
           </select>
         </div>
