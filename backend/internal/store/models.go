@@ -22,13 +22,21 @@ type Service struct {
 
 // OrderItem é um serviço dentro do pedido. Piece é a peça de roupa em que ele
 // será feito — "calça jeans", "vestido de festa" —, texto livre e opcional.
+//
+// Due, DueTime e DeliveredAt são da peça, não do serviço: a tela grava os três
+// iguais em todos os serviços do mesmo bloco de peça. Due vazio significa que
+// a peça segue a data do pedido, e DeliveredAt vazio que ela ainda não foi
+// retirada.
 type OrderItem struct {
-	ID         int64  `json:"id"`
-	ServiceID  *int64 `json:"serviceId"`
-	Name       string `json:"name"`
-	Piece      string `json:"piece"`
-	Qty        int64  `json:"qty"`
-	PriceCents int64  `json:"priceCents"`
+	ID          int64  `json:"id"`
+	ServiceID   *int64 `json:"serviceId"`
+	Name        string `json:"name"`
+	Piece       string `json:"piece"`
+	Qty         int64  `json:"qty"`
+	PriceCents  int64  `json:"priceCents"`
+	Due         string `json:"due"`
+	DueTime     string `json:"dueTime"`
+	DeliveredAt string `json:"deliveredAt"`
 }
 
 // Payment é um dinheiro que entrou num pedido. A cliente deixa a peça e paga

@@ -297,6 +297,22 @@ func (s *Server) validateOrder(w http.ResponseWriter, o *store.Order) bool {
 			writeErr(w, http.StatusUnprocessableEntity, "O preço de um item não pode ser negativo.")
 			return false
 		}
+
+		// A entrega da peça segue as mesmas regras da entrega do pedido: hora
+		// sem dia é descartada, e a hora que vier precisa ser hora.
+		it.Due = strings.TrimSpace(it.Due)
+		it.DueTime = strings.TrimSpace(it.DueTime)
+		it.DeliveredAt = strings.TrimSpace(it.DeliveredAt)
+		if it.Due == "" {
+			it.DueTime = ""
+		}
+		if it.DueTime != "" {
+			if _, err := time.Parse("15:04", it.DueTime); err != nil {
+				writeErr(w, http.StatusUnprocessableEntity,
+					"O horário de entrega de uma peça deve estar no formato HH:MM, como 14:30.")
+				return false
+			}
+		}
 	}
 	return true
 }
@@ -326,6 +342,40 @@ func (s *Server) setOrderStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := s.st.SetOrderStatus(id, in.Status)
+	if err != nil {
+		writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// pieceBody é o corpo de PUT /api/orders/{id}/pieces/delivered: qual peça
+// saiu e em que dia. deliveredAt vazio desmarca a retirada.
+type pieceBody struct {
+	Piece       string `json:"piece"`
+	DeliveredAt string `json:"deliveredAt"`
+}
+
+// setPieceDelivered registra que a cliente levou uma peça do pedido. A peça é
+// identificada pelo nome, que é o que agrupa os serviços dela — é assim que o
+// pedido guarda a peça desde a migração 0004.
+func (s *Server) setPieceDelivered(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	var in pieceBody
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+
+	// O nome não é trimado: ele tem de casar exatamente com o que está
+	// gravado nos itens, e a gravação já chega trimada pelo validateOrder.
+	// Aparar aqui faria a peça " " não achar nada e parecer um erro do
+	// sistema. A peça sem nome é válida — é o bloco que ela deixou em branco.
+	in.DeliveredAt = strings.TrimSpace(in.DeliveredAt)
+
+	out, err := s.st.SetPieceDelivered(id, in.Piece, in.DeliveredAt)
 	if err != nil {
 		writeStoreErr(w, err)
 		return

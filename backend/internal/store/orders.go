@@ -85,7 +85,8 @@ func (s *Store) attachItems(orders []Order, byID map[int64]int) error {
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
 
 	rows, err := s.db.Query(
-		`SELECT order_id, id, service_id, name, piece, qty, price_cents
+		`SELECT order_id, id, service_id, name, piece, qty, price_cents,
+		        due, due_time, delivered_at
 		 FROM order_items WHERE order_id IN (`+placeholders+`)
 		 ORDER BY order_id, position, id`, ids...)
 	if err != nil {
@@ -97,7 +98,11 @@ func (s *Store) attachItems(orders []Order, byID map[int64]int) error {
 		var orderID int64
 		var it OrderItem
 		var serviceID sql.NullInt64
-		if err := rows.Scan(&orderID, &it.ID, &serviceID, &it.Name, &it.Piece, &it.Qty, &it.PriceCents); err != nil {
+		err := rows.Scan(
+			&orderID, &it.ID, &serviceID, &it.Name, &it.Piece, &it.Qty, &it.PriceCents,
+			&it.Due, &it.DueTime, &it.DeliveredAt,
+		)
+		if err != nil {
 			return err
 		}
 		idx, ok := byID[orderID]
@@ -245,6 +250,37 @@ func (s *Store) SetOrderStatus(id int64, status string) (Order, error) {
 	return s.GetOrder(id)
 }
 
+// SetPieceDelivered marca ou desmarca a retirada de uma peça do pedido, sem
+// tocar em nada mais — mesma razão do SetOrderStatus: é o que ela faz no
+// balcão, com a cliente na frente, e mandar o pedido inteiro de volta só para
+// dizer que a calça saiu reescreveria todos os itens à toa.
+//
+// `piece` é o nome da peça, que é o que agrupa os serviços dela. Todos os
+// serviços daquela peça saem juntos: quem leva a calça leva a bainha e o
+// ajuste de cintura que foram feitos nela.
+//
+// deliveredAt vazio desmarca, para a retirada registrada por engano ter
+// volta.
+func (s *Store) SetPieceDelivered(orderID int64, piece, deliveredAt string) (Order, error) {
+	// Confere o pedido primeiro: sem isto, um id que não existe daria o mesmo
+	// "peça não encontrada" de um nome errado, e são problemas diferentes.
+	if _, err := s.GetOrder(orderID); err != nil {
+		return Order{}, err
+	}
+
+	res, err := s.db.Exec(
+		`UPDATE order_items SET delivered_at = ? WHERE order_id = ? AND piece = ?`,
+		deliveredAt, orderID, piece,
+	)
+	if err != nil {
+		return Order{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Order{}, ErrNotFound
+	}
+	return s.GetOrder(orderID)
+}
+
 func (s *Store) DeleteOrder(id int64) error {
 	res, err := s.db.Exec(`DELETE FROM orders WHERE id = ?`, id)
 	if err != nil {
@@ -279,9 +315,12 @@ func replaceItems(tx *sql.Tx, orderID int64, items []OrderItem) error {
 			serviceID = *it.ServiceID
 		}
 		_, err := tx.Exec(
-			`INSERT INTO order_items (order_id, service_id, name, piece, qty, price_cents, position)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO order_items
+			   (order_id, service_id, name, piece, qty, price_cents, position,
+			    due, due_time, delivered_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			orderID, serviceID, it.Name, it.Piece, it.Qty, it.PriceCents, i,
+			it.Due, it.DueTime, it.DeliveredAt,
 		)
 		if err != nil {
 			return err

@@ -1,10 +1,56 @@
 <script>
   import { data } from '../lib/data.svelte.js'
-  import { money, fmtDate, fmtDateTime, statusClass } from '../lib/format.js'
+  import {
+    money,
+    fmtDate,
+    fmtDateTime,
+    statusClass,
+    todasAsEntregas,
+    todasRetiradas,
+    groupItemsByPiece,
+    porHora,
+    today,
+  } from '../lib/format.js'
 
   let { goto } = $props()
 
   const s = $derived(data.summary)
+
+  const CONCLUIDOS = ['Entregue', 'Cancelado']
+
+  /* As próximas entregas, contadas pela entrega de cada peça — a mesma regra
+     da agenda e do quadro da parede.
+
+     Antes esta lista vinha pronta do servidor, ordenada pela data do pedido.
+     Com a data por peça isso passou a mentir: a calça que sai amanhã ficaria
+     escondida atrás da data do pedido, que é semana que vem. Quem sabe
+     desdobrar o pedido em entregas é o ajudante que a agenda já usa, então a
+     lista é montada aqui, dos mesmos pedidos que a tela já tem.
+
+     Fica de fora o que já saiu do ateliê: etapa concluída, ou todas as peças
+     daquela entrega retiradas. */
+  const PROXIMAS = 5
+
+  const proximasEntregas = $derived.by(() => {
+    const hoje = today()
+    return todasAsEntregas(data.orders)
+      .filter(
+        (e) =>
+          e.due &&
+          e.due >= hoje &&
+          !CONCLUIDOS.includes(e.status) &&
+          !todasRetiradas(e.items),
+      )
+      .sort((a, b) => (a.due === b.due ? porHora(a, b) : a.due < b.due ? -1 : 1))
+      .slice(0, PROXIMAS)
+  })
+
+  /** "Calça jeans, Vestido" — as peças que saem naquela entrega. */
+  const pecasDaEntrega = (entrega) =>
+    groupItemsByPiece(entrega.items)
+      .map((g) => g.peca)
+      .filter(Boolean)
+      .join(', ')
 </script>
 
 <div class="cards">
@@ -56,11 +102,16 @@
 
   <div class="card">
     <div class="section-title"><h2>Próximas entregas</h2></div>
-    {#each s?.upcomingOrders ?? [] as o (o.id)}
+    {#each proximasEntregas as e (e.chave)}
       <div style="padding:12px 0;border-bottom:1px solid var(--border)">
-        <b>{o.clientName}</b><br />
+        <b>{e.clientName}</b>
+        {#if e.parcial}
+          <span class="entrega-parcial">parcial</span>
+        {/if}
+        <br />
         <span style="font-size:12px;color:var(--muted)">
-          #{o.number} · entrega {fmtDateTime(o.due, o.dueTime)}
+          #{e.number} · entrega {fmtDateTime(e.due, e.dueTime)}
+          {#if pecasDaEntrega(e)}<br />{pecasDaEntrega(e)}{/if}
         </span>
       </div>
     {:else}

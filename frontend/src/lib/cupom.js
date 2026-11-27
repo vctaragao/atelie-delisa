@@ -14,7 +14,13 @@
      trocar pelo navegador. Acento cai nessa tabela e sai como ideograma,
      então o comprovante é emitido sem acento. */
 
-import { money, fmtDate, fmtDateTime, groupItemsByPiece } from './format.js'
+import {
+  money,
+  fmtDate,
+  fmtDateTime,
+  groupItemsByPiece,
+  entregaDaPeca,
+} from './format.js'
 
 /** Largura útil da bobina, em caracteres. */
 export const COLUNAS = 32
@@ -150,6 +156,15 @@ export function cupom(pedido, cliente, emitidoEm = new Date()) {
     // Cabeçalho para os serviços sem peça informada só quando há outros com
     // peça: senão a cliente leria um título solto num cupom de um item só.
     else if (temPeca) linhas.push(...quebrar('OUTROS SERVICOS'))
+
+    /* A data da peça, quando ela tem uma diferente da do pedido. É o que
+       evita a cliente levar para casa um papel dizendo que tudo sai na
+       segunda quando a calça está pronta na sexta — a linha "Entrega" lá em
+       cima é a combinação geral, e esta é a exceção. */
+    const entrega = entregaDaPeca(pedido, grupo.itens)
+    if (entrega.propria) {
+      linhas.push(...par('  Entrega', fmtDateTime(entrega.due, entrega.dueTime)))
+    }
 
     for (const item of grupo.itens) {
       linhas.push(...quebrar(item.name))

@@ -2,7 +2,15 @@
   import Modal from '../lib/Modal.svelte'
   import { api } from '../lib/api.js'
   import { data, mutate } from '../lib/data.svelte.js'
-  import { money, toCents, fmtDate, today } from '../lib/format.js'
+  import {
+    money,
+    toCents,
+    fmtDate,
+    today,
+    temSaldoAberto,
+    faltaReceber,
+    statusClass,
+  } from '../lib/format.js'
 
   let adding = $state(false)
   let saving = $state(false)
@@ -10,6 +18,21 @@
   let form = $state(blank())
 
   const s = $derived(data.summary)
+
+  /* Quem está devendo, do mais antigo para o mais novo.
+
+     O "Total pendente" lá em cima sempre mostrou o valor, e só o valor: para
+     saber de quem era aquele dinheiro, ela tinha de abrir a lista de ordens e
+     conferir pedido por pedido. Esta tabela é a conta aberta — a soma dos
+     valores daqui é exatamente o que o cartão mostra.
+
+     Mais antigo primeiro porque é o que está parado há mais tempo, e é por
+     ele que se começa a cobrar. */
+  const pendentes = $derived(
+    data.orders
+      .filter(temSaldoAberto)
+      .sort((a, b) => (a.date === b.date ? Number(a.number) - Number(b.number) : a.date < b.date ? -1 : 1)),
+  )
 
   /**
    * O movimento do caixa: os lançamentos escritos à mão e as baixas dos
@@ -97,6 +120,9 @@
   <div class="card">
     <div class="metric-label">Total pendente</div>
     <div class="metric gold">{money(s?.receivableCents)}</div>
+    <div class="metric-rodape">
+      {pendentes.length === 1 ? '1 pedido' : `${pendentes.length} pedidos`} a receber
+    </div>
   </div>
   <div class="card">
     <div class="metric-label">Despesas</div>
@@ -106,6 +132,59 @@
     <div class="metric-label">Saldo</div>
     <div class="metric">{money(s?.balanceCents)}</div>
   </div>
+</div>
+
+<div class="card">
+  <div class="section-title">
+    <h2>Pagamentos pendentes</h2>
+    <span class="agenda-resumo">
+      {#if pendentes.length}
+        {pendentes.length === 1 ? '1 pedido' : `${pendentes.length} pedidos`} ·
+        {money(pendentes.reduce((soma, o) => soma + faltaReceber(o), 0))} a receber
+      {/if}
+    </span>
+  </div>
+
+  {#if pendentes.length}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Entrada</th><th>Pedido</th><th>Cliente</th><th>Entrega</th>
+            <th>Etapa</th><th>Total</th><th>Já pago</th><th>Falta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each pendentes as o (o.id)}
+            <tr>
+              <td>{fmtDate(o.date)}</td>
+              <td><b>#{o.number}</b></td>
+              <td style="white-space:normal">{o.clientName}</td>
+              <td>{fmtDate(o.due)}</td>
+              <td><span class="badge {statusClass(o.status)}">{o.status}</span></td>
+              <td>{money(o.totalCents)}</td>
+              <td>
+                {#if o.paidCents > 0}
+                  {money(o.paidCents)}
+                {:else}
+                  <span class="agenda-resumo">nada ainda</span>
+                {/if}
+              </td>
+              <td><b class="devendo">{money(faltaReceber(o))}</b></td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <p class="field-dica">
+      Do mais antigo para o mais novo — é por ele que se começa a cobrar. A
+      baixa de cada pagamento é dada no botão <b>Pagamentos</b> do pedido, na
+      tela de Ordens, onde o filtro <b>A receber</b> mostra esta mesma lista.
+      Pedido cancelado não entra aqui.
+    </p>
+  {:else}
+    <p class="empty">Nenhum pagamento pendente — está tudo recebido.</p>
+  {/if}
 </div>
 
 <div class="toolbar">

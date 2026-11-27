@@ -1119,3 +1119,123 @@ label,
 @media (max-width: 600px) {
   .pagamento-conta { grid-template-columns: 1fr; }
 }
+
+/* Entrega e retirada de uma peça, no cabeçalho do bloco dela. A linha é
+   compacta de propósito: é informação do pedido, não o assunto principal do
+   bloco, que são os serviços. */
+.peca-entrega {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.peca-entrega > label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.peca-entrega input[type='date'],
+.peca-entrega input[type='time'] { font-size: 13px; }
+.peca-entrega input:disabled { background: #f4f6f5; color: var(--muted); }
+
+/* A retirada é uma caixinha com o texto ao lado, não uma coluna como as
+   datas: ela é marcada com a cliente na frente e precisa de alvo grande. */
+.peca-retirada {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px !important;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+.peca-retirada input { width: 17px; height: 17px; cursor: pointer; }
+.peca-retirada:has(input:checked) {
+  border-color: var(--teal);
+  background: #eef4f3;
+  color: var(--teal);
+}
+.peca-dica { margin-top: -2px; }
+
+/* Uma peça na agenda, com a caixinha de "a cliente levou" ao lado. A linha
+   inteira é clicável porque é um <label>: ela dá baixa com a cliente na
+   frente, e o alvo não pode ser só o quadradinho. */
+.peca-levou {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.peca-levou input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+/* Peça que já saiu fica apagada e riscada: o que importa na agenda é o que
+   ainda está no ateliê. */
+.peca-levou.levou > span {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.peca-levou.levou .agenda-resumo { text-decoration: none; }
+
+/* Aviso de que o pedido tem peças em mais de um dia, e aquela linha é só a
+   parte que sai naquele. Sem isso ela veria o mesmo pedido em dois dias sem
+   entender por quê. */
+.entrega-parcial {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  white-space: nowrap;
+}
+
+/* Uma peça na lista de ordens: os serviços dela e, quando houver, a data
+   própria e o dia em que a cliente levou. */
+.ordem-peca { padding: 1px 0; }
+.ordem-peca.levou { color: var(--muted); }
+.ordem-peca.levou .item-peca { text-decoration: line-through; }
+.peca-data {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--teal);
+  background: #eef4f3;
+  border-radius: 5px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* O filtro de pagamento pendente fica junto das etapas, mas não é uma delas:
+   o empurrão para a direita é o que separa os dois cortes da lista. */
+.pendente-filtro { margin-left: auto; }
+.pendente-filtro.ativa {
+  border-color: var(--gold);
+  background: #fdf6e8;
+  color: #7a5c17;
+}
+@media (max-width: 760px) {
+  .pendente-filtro { margin-left: 0; }
+}
+
+/* Rodapé de um cartão de métrica: a mesma informação em outra unidade — o
+   valor pendente em reais lá em cima, e quantos pedidos formam esse valor
+   aqui embaixo. */
+.metric-rodape {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
